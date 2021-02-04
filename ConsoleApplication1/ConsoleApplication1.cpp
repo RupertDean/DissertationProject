@@ -126,6 +126,15 @@ int main(int, char**){
         return -1;
     }
 
+    // load cascade for profile face detection
+    const String profile_cascade_name = "C:/lib/opencv/data/haarcascades/haarcascade_profileface.xml";
+    CascadeClassifier profile_face_cascade;
+
+    if (not profile_face_cascade.load(profile_cascade_name)) {
+        cerr << "Cannot load cascade classifier from file: " << profile_cascade_name << endl;
+        return -1;
+    }
+
     const string facemark_filename = "C:/lib/opencv/data/landmark_models/lbfmodel.yaml";
     Ptr<Facemark> facemark = createFacemarkLBF();
     facemark->loadModel(facemark_filename);
@@ -156,6 +165,38 @@ int main(int, char**){
 
             if (cv::waitKey(1) == 32) base = saveBaseLandmarks(shapes);
             calculateMovements(base, calculateVals(shapes));
+        }
+        else {
+            faceDetector(gray, faces, profile_face_cascade);
+            if (faces.size() != 0) {
+                // We assume a single face so we look at the first only
+                cv::rectangle(frame, faces[0], Scalar(0, 255, 0), 2);
+
+                if (facemark->fit(gray, faces, shapes)) {
+                    // Draw the detected landmarks
+                    drawFacemarks(frame, shapes[0], cv::Scalar(0, 0, 255));
+                }
+
+                if (cv::waitKey(1) == 32) base = saveBaseLandmarks(shapes);
+                calculateMovements(base, calculateVals(shapes));
+            }
+            else {
+                flip(gray, flipped, 1);
+                faceDetector(flipped, faces, profile_face_cascade);
+
+                if (faces.size() != 0) {
+                    // We assume a single face so we look at the first only
+                    cv::rectangle(frame, faces[0], Scalar(0, 255, 0), 2);
+
+                    if (facemark->fit(gray, faces, shapes)) {
+                        // Draw the detected landmarks
+                        drawFacemarks(frame, shapes[0], cv::Scalar(0, 0, 255));
+                    }
+
+                    if (cv::waitKey(1) == 32) base = saveBaseLandmarks(shapes);
+                    calculateMovements(base, calculateVals(shapes));
+                }
+            }
         }
         
 
