@@ -1,14 +1,15 @@
-// ConsoleApplication1.cpp : This file contains the 'main' function. Program execution begins and ends there.
-//
+#define WINVER 0x0500
 
 #include "opencv2/opencv.hpp"
 #include "opencv2/face.hpp"
 #include "iostream"
+#include <windows.h>
 
 using namespace cv;
 using namespace cv::face;
 using namespace std;
 
+// Function to detect faces in given image
 void faceDetector(const Mat& image, vector<Rect>& faces, CascadeClassifier& face_cascade){
     // Histogram equalization generally aids in face detection
     equalizeHist(image, image);
@@ -19,16 +20,18 @@ void faceDetector(const Mat& image, vector<Rect>& faces, CascadeClassifier& face
         image,
         faces,
         1.5, // pyramid scale factor
-        3,   // lower thershold for neighbors count
+        5,   // lower thershold for neighbors count
              // here we hint the classifier to only look for one face
         CASCADE_SCALE_IMAGE + CASCADE_FIND_BIGGEST_OBJECT);
 }
 
+// Returns distance between 2 2D points
 float dist(Point2f a, Point2f b) {
     return sqrtf(pow(b.x - a.x, 2) + pow(b.y - a.y, 2));
 }
 
-// 0 eyeDist, 1 leftCheek, 2 rightCheek, 3 mouthDist, 4 eyeToChin, 5 browDist, 6 browEyeWidth, 7 jawChinDist, 8 eyesOpen
+// Returns a vector with distances between points on the face
+// 0 eyeDist, 1 leftCheek, 2 rightCheek, 3 mouthDist, 4 eyeToChin, 5 browDist, 6 browEyeWidth, 7 jawChinDist, 8 eyesOpen, 9 eyeBrowDist
 vector<float> calculateVals(vector<vector<Point2f>> current) {
     vector<float> vals = {
     dist(current[0][37], current[0][41]) + dist(current[0][38], current[0][40]) +
@@ -43,15 +46,17 @@ vector<float> calculateVals(vector<vector<Point2f>> current) {
     dist(current[0][17], current[0][26]) + dist(current[0][36], current[0][45]),
     dist(current[0][4], current[0][8]) + dist(current[0][12], current[0][8]),
     dist(current[0][37], current[0][41]) + dist(current[0][38], current[0][40]) +
-        dist(current[0][43], current[0][47]) + dist(current[0][44], current[0][46])
+        dist(current[0][43], current[0][47]) + dist(current[0][44], current[0][46]),
+    dist(current[0][19], current[0][40]) + dist(current[0][24], current[0][47]),
     };
 
     return vals;
 }
 
-void calculateMovements(vector<float> base, vector<float> current) {
+// Estimates movements based on differences in distances between base and current images
+void calculateMovements(vector<float> base, vector<float> current, INPUT ip) {
     if (current[4] / base[4] < 0.95f) {
-        if (current[7] / base[7] > 1.05f) {
+        if (current[9] / base[9] < 0.95f) {
             printf("PD ");
         }
         else if (current[7] / base[7] < 0.95f){
@@ -61,26 +66,44 @@ void calculateMovements(vector<float> base, vector<float> current) {
 
     if (current[3] / base[3] > 1.3f) {
         printf("MO ");
+
+        ip.ki.wVk = 0x20; // virtual-key code for the space key
+        ip.ki.dwFlags = 0; // 0 for key press
+        SendInput(1, &ip, sizeof(INPUT));
+
+        // Release the key
+        ip.ki.dwFlags = KEYEVENTF_KEYUP; // KEYEVENTF_KEYUP for key release
+        SendInput(1, &ip, sizeof(INPUT));
     }
 
     if (current[8] / base[8] < 0.75f) {
         printf("EC ");
+
+        ip.ki.wVk = 0x45; // virtual-key code for the E key
+        ip.ki.dwFlags = 0; // 0 for key press
+        SendInput(1, &ip, sizeof(INPUT));
+
+        // Release the key
+        ip.ki.dwFlags = KEYEVENTF_KEYUP; // KEYEVENTF_KEYUP for key release
+        SendInput(1, &ip, sizeof(INPUT));   
     }
 
-    if (current[1] / base[1] > 1.1f) {
-        if (current[2] / base[2] < 1.1f) {
+    if (current[1] / base[1] > 1.2f) {
+        if (current[2] / base[2] < 1.2f) {
             printf("YL ");
+ 
         }
     }
-    else if (current[2] / base[2] > 1.1f) {
-        if (current[1] / base[1] < 1.1f) {
+    else if (current[2] / base[2] > 1.2f) {
+        if (current[1] / base[1] < 1.2f) {
             printf("YR ");
+
         }
     }
-
 
 }
 
+// Saves landmarks in current frame
 vector<float> saveBaseLandmarks(vector<vector<Point2f>> shapes) {
     vector<vector<Point2f>> base = shapes;
     vector<float> vals = calculateVals(base);
@@ -100,6 +123,13 @@ void printVals(vector<vector<Point2f>> current) {
 }
 
 int main(int, char**){
+
+    INPUT ip;
+    ip.type = INPUT_KEYBOARD;
+    ip.ki.wScan = 0;
+    ip.ki.time = 0;
+    ip.ki.dwExtraInfo = 0;
+
     // open the first webcam plugged in the computer
     VideoCapture camera(0);
     if (!camera.isOpened()){
@@ -141,7 +171,7 @@ int main(int, char**){
     cout << "Loaded facemark LBF model" << endl;
 
     vector<vector<Point2f>> shapes;
-    vector<float> base = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+    vector<float> base = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
     while(1) {
         // capture the next frame from the webcam
@@ -164,7 +194,7 @@ int main(int, char**){
             // printf("%f, %f \n", shapes[0][67].x, shapes[0][67].y);
 
             if (cv::waitKey(1) == 32) base = saveBaseLandmarks(shapes);
-            calculateMovements(base, calculateVals(shapes));
+            calculateMovements(base, calculateVals(shapes), ip);
         }
         else {
             faceDetector(gray, faces, profile_face_cascade);
@@ -178,7 +208,7 @@ int main(int, char**){
                 }
 
                 if (cv::waitKey(1) == 32) base = saveBaseLandmarks(shapes);
-                calculateMovements(base, calculateVals(shapes));
+                calculateMovements(base, calculateVals(shapes), ip);
             }
             else {
                 flip(gray, flipped, 1);
@@ -194,7 +224,7 @@ int main(int, char**){
                     }
 
                     if (cv::waitKey(1) == 32) base = saveBaseLandmarks(shapes);
-                    calculateMovements(base, calculateVals(shapes));
+                    calculateMovements(base, calculateVals(shapes), ip);
                 }
             }
         }
