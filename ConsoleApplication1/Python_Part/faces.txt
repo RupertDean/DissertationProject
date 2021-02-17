@@ -1,0 +1,170 @@
+.. _faces_dataset:
+
+Faces dataset
+--------------------
+
+**Data Set Characteristics:**
+
+    :Number of Instances: 150 (50 in each of three classes)
+    :Number of Attributes: 136 numeric, predictive attributes and the class
+    :Attribute Information:
+        - 1 X in px
+        - 1 Y in px
+        - 2 X in px
+        - 2 Y in px
+        - 3 X in px
+        - 3 Y in px
+        - 4 X in px
+        - 4 Y in px
+        - 5 X in px
+        - 5 Y in px
+        - 6 X in px
+        - 6 Y in px
+        - 7 X in px
+        - 7 Y in px
+        - 8 X in px
+        - 8 Y in px
+        - 9 X in px
+        - 9 Y in px
+        - 10 X in px
+        - 10 Y in px
+        - 11 X in px
+        - 11 Y in px
+        - 12 X in px
+        - 12 Y in px
+        - 13 X in px
+        - 13 Y in px
+        - 14 X in px
+        - 14 Y in px
+        - 15 X in px
+        - 15 Y in px
+        - 16 X in px
+        - 16 Y in px
+        - 17 X in px
+        - 17 Y in px
+        - 18 X in px
+        - 18 Y in px
+        - 19 X in px
+        - 19 Y in px
+        - 20 X in px
+        - 20 Y in px
+        - 21 X in px
+        - 21 Y in px
+        - 22 X in px
+        - 22 Y in px
+        - 23 X in px
+        - 23 Y in px
+        - 24 X in px
+        - 24 Y in px
+        - 25 X in px
+        - 25 Y in px
+        - 26 X in px
+        - 26 Y in px
+        - 27 X in px
+        - 27 Y in px
+        - 28 X in px
+        - 28 Y in px
+        - 29 X in px
+        - 29 Y in px
+        - 30 X in px
+        - 30 Y in px
+        - 31 X in px
+        - 31 Y in px
+        - 32 X in px
+        - 32 Y in px
+        - 33 X in px
+        - 33 Y in px
+        - 34 X in px
+        - 34 Y in px
+        - 35 X in px
+        - 35 Y in px
+        - 36 X in px
+        - 36 Y in px
+        - 37 X in px
+        - 37 Y in px
+        - 38 X in px
+        - 38 Y in px
+        - 39 X in px
+        - 39 Y in px
+        - 40 X in px
+        - 40 Y in px
+        - 41 X in px
+        - 41 Y in px
+        - 42 X in px
+        - 42 Y in px
+        - 43 X in px
+        - 43 Y in px
+        - 44 X in px
+        - 44 Y in px
+        - 45 X in px
+        - 45 Y in px
+        - 46 X in px
+        - 46 Y in px
+        - 47 X in px
+        - 47 Y in px
+        - 48 X in px
+        - 48 Y in px
+        - 49 X in px
+        - 49 Y in px
+        - 50 X in px
+        - 50 Y in px
+        - 51 X in px
+        - 51 Y in px
+        - 52 X in px
+        - 52 Y in px
+        - 53 X in px
+        - 53 Y in px
+        - 54 X in px
+        - 54 Y in px
+        - 55 X in px
+        - 55 Y in px
+        - 56 X in px
+        - 56 Y in px
+        - 57 X in px
+        - 57 Y in px
+        - 58 X in px
+        - 58 Y in px
+        - 59 X in px
+        - 59 Y in px
+        - 60 X in px
+        - 60 Y in px
+        - 61 X in px
+        - 61 Y in px
+        - 62 X in px
+        - 62 Y in px
+        - 63 X in px
+        - 63 Y in px
+        - 64 X in px
+        - 64 Y in px
+        - 65 X in px
+        - 65 Y in px
+        - 66 X in px
+        - 66 Y in px
+        - 67 X in px
+        - 67 Y in px
+        - 68 X in px
+        - 68 Y in px
+        - class:
+                - Pitch Up
+                - Pitch Down
+                - Roll Left
+                - Roll Right
+                - Yaw Left
+                - Yaw Right
+                - Mouth Open
+                - Eyes Closed
+
+    :Summary Statistics:
+
+    ============== ==== ==== ======= ===== ====================
+                    Min  Max   Mean    SD   Class Correlation
+    ============== ==== ==== ======= ===== ====================
+    X deviation:    4.3  7.9   5.84   0.83   0.9
+    Y deviation:    2.0  4.4   3.05   0.43   0.9
+    ============== ==== ==== ======= ===== ====================
+
+    :Missing Attribute Values: None
+    :Class Distribution: 12.5% for each of 8 classes.
+    :Creator: R.H.F.Dean
+    :Donor: None
+    :Date: February 21

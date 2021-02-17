@@ -3,11 +3,14 @@
 #include "opencv2/opencv.hpp"
 #include "opencv2/face.hpp"
 #include "iostream"
+
 #include <windows.h>
+#include <fstream>
 
 using namespace cv;
 using namespace cv::face;
 using namespace std;
+
 
 // Function to detect faces in given image
 void faceDetector(const Mat& image, vector<Rect>& faces, CascadeClassifier& face_cascade){
@@ -123,6 +126,7 @@ void printVals(vector<vector<Point2f>> current) {
 }
 
 int main(int, char**){
+#define TRAINING false
 
     INPUT ip;
     ip.type = INPUT_KEYBOARD;
@@ -173,6 +177,57 @@ int main(int, char**){
     vector<vector<Point2f>> shapes;
     vector<float> base = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
+#if TRAINING
+    int i = 1;
+
+    ofstream faces_csv;
+    faces_csv.open("Python_Part/faces.csv");
+
+    faces_csv << "num" + ',' + to_string(140) + ',' + "Pitch Up" + ',' + "Pitch Down" + ',' + "Roll Left" + ',' + "Roll Right" + ',' + "Yaw Left" + ',' + "Yaw Right" + ',' + "Mouth Open" + ',' + "Eyes Closed" + ",\n";
+
+    while (1) {
+        camera >> frame;
+
+        cvtColor(frame, gray, COLOR_BGR2GRAY);
+
+        // ... obtain an image in img
+        faceDetector(gray, faces, face_cascade);
+        // Check if faces detected or not
+        if (faces.size() != 0) {
+            // We assume a single face so we look at the first only
+            cv::rectangle(frame, faces[0], Scalar(255, 0, 0), 2);
+
+            if (facemark->fit(gray, faces, shapes)) {
+                // Draw the detected landmarks
+                drawFacemarks(frame, shapes[0], cv::Scalar(0, 0, 255));
+            }
+
+        }
+
+        imshow("Webcam", frame);
+
+        if (cv::waitKey(10) == 32) {
+            saveBaseLandmarks(shapes);
+
+            for (int i = 0; i < 68; i++) {
+                faces_csv << to_string(shapes[0][i].x) + ',' + to_string(shapes[0][i].y) + ',';
+            }
+
+            faces_csv << to_string(faces[0].x) + ',' + (to_string(faces[0].x) + to_string(faces[0].width));
+            faces_csv << to_string(faces[0].y) + ',' + (to_string(faces[0].y) + to_string(faces[0].height));
+
+            faces_csv << "\n";
+
+            i++;
+        }
+
+        if (cv::waitKey(1) == 27) break;
+    }
+
+    faces_csv.close();
+#endif
+
+#if not TRAINING
     while(1) {
         // capture the next frame from the webcam
         camera >> frame;
@@ -236,6 +291,7 @@ int main(int, char**){
         if(cv::waitKey(1) == 27) break;
 
     }
+#endif
       
 
     return 0;
