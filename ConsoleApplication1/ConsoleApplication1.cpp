@@ -6,6 +6,7 @@
 
 #include <windows.h>
 #include <fstream>
+#include <math.h>
 
 using namespace cv;
 using namespace cv::face;
@@ -22,7 +23,7 @@ void faceDetector(const Mat& image, vector<Rect>& faces, CascadeClassifier& face
     face_cascade.detectMultiScale(
         image,
         faces,
-        1.5, // pyramid scale factor
+        2.0, // pyramid scale factor
         5,   // lower thershold for neighbors count
              // here we hint the classifier to only look for one face
         CASCADE_SCALE_IMAGE + CASCADE_FIND_BIGGEST_OBJECT);
@@ -35,7 +36,7 @@ float dist(Point2f a, Point2f b) {
 
 // Returns a vector with distances between points on the face
 // 0 eyeDist, 1 leftCheek, 2 rightCheek, 3 mouthDist, 4 eyeToChin, 5 browDist, 6 browEyeWidth, 7 jawChinDist, 8 eyesOpen, 9 eyeBrowDist
-vector<float> calculateVals(vector<vector<Point2f>> current) {
+vector<float> calculateVals(vector<vector<Point2f>> current, Rect face){
     vector<float> vals = {
     dist(current[0][37], current[0][41]) + dist(current[0][38], current[0][40]) +
         dist(current[0][43], current[0][47]) + dist(current[0][44], current[0][46]),
@@ -50,66 +51,116 @@ vector<float> calculateVals(vector<vector<Point2f>> current) {
     dist(current[0][4], current[0][8]) + dist(current[0][12], current[0][8]),
     dist(current[0][37], current[0][41]) + dist(current[0][38], current[0][40]) +
         dist(current[0][43], current[0][47]) + dist(current[0][44], current[0][46]),
-    dist(current[0][19], current[0][40]) + dist(current[0][24], current[0][47]),
+    current[0][8].y,
+        0, 0
     };
+
+    for (int i = 0; i < vals.size(); i++) {
+        vals[i] /= face.area();
+    }
+
+    vals[10] = ((face.y + face.height) - face.y) / ((face.x + face.width) - face.x);
+    vals[11] = (current[0][0].y - current[0][16].y)/(current[0][0].x - current[0][16].x);
 
     return vals;
 }
 
 // Estimates movements based on differences in distances between base and current images
-void calculateMovements(vector<float> base, vector<float> current, INPUT ip) {
-    if (current[4] / base[4] < 0.95f) {
-        if (current[9] / base[9] < 0.95f) {
-            printf("PD ");
-        }
-        else if (current[7] / base[7] < 0.95f){
-            printf("PU ");
-        }
-    }
+String calculateMovements(vector<float> base, vector<float> current, INPUT kb, INPUT ms) {
+    float angleCurrent = atan((current[11] - current[10])/(1.0f + current[10] * current[11])) * 180.0f / 3.4159265f;
+    float angleBase = atan((base[11] - base[10]) / (1.0f + base[10] * base[11])) * 180.0f / 3.4159265f;
 
-    if (current[3] / base[3] > 1.3f) {
-        printf("MO ");
-
-        ip.ki.wVk = 0x20; // virtual-key code for the space key
-        ip.ki.dwFlags = 0; // 0 for key press
-        SendInput(1, &ip, sizeof(INPUT));
+    if (current[3] / base[3] > 1.15f) {
+        kb.ki.wVk = 0x20; // virtual-key code for the space key
+        kb.ki.dwFlags = 0; // 0 for key press
+        SendInput(1, &kb, sizeof(INPUT));
 
         // Release the key
-        ip.ki.dwFlags = KEYEVENTF_KEYUP; // KEYEVENTF_KEYUP for key release
-        SendInput(1, &ip, sizeof(INPUT));
+        kb.ki.dwFlags = KEYEVENTF_KEYUP; // KEYEVENTF_KEYUP for key release
+        SendInput(1, &kb, sizeof(INPUT));
     }
 
-    if (current[8] / base[8] < 0.75f) {
-        printf("EC ");
-
-        ip.ki.wVk = 0x45; // virtual-key code for the E key
-        ip.ki.dwFlags = 0; // 0 for key press
-        SendInput(1, &ip, sizeof(INPUT));
-
+    if (current[8] / base[8] < 0.85f) {
+        /**
+        kb.ki.wVk = 0x45; // virtual-key code for left click
+        kb.ki.dwFlags = 0; // 0 for key press
+        SendInput(1, &kb, sizeof(INPUT));
         // Release the key
-        ip.ki.dwFlags = KEYEVENTF_KEYUP; // KEYEVENTF_KEYUP for key release
-        SendInput(1, &ip, sizeof(INPUT));   
+        kb.ki.dwFlags = KEYEVENTF_KEYUP; // KEYEVENTF_KEYUP for key release
+        SendInput(1, &kb, sizeof(INPUT));
+        **/
+
     }
 
-    if (current[1] / base[1] > 1.2f) {
+    if (angleCurrent / angleBase > 1.1f) {
+        
+        //return "RR";
+    }
+    else if (angleCurrent / angleBase < 0.9f) {
+        kb.ki.wVk = 0x1B; // virtual-key code for the ESC key
+        kb.ki.dwFlags = 0; // 0 for key press
+        SendInput(1, &kb, sizeof(INPUT));
+
+        kb.ki.dwFlags = KEYEVENTF_KEYUP;
+        SendInput(1, &kb, sizeof(INPUT));
+        return "RL";
+    }
+
+
+    if (current[9] / base[9] > 1.05f) {
+        kb.ki.wVk = 0x53; // virtual-key code for the A key
+        kb.ki.dwFlags = 0; // 0 for key press
+        SendInput(1, &kb, sizeof(INPUT));
+        return "PD";
+    }
+    else if (current[9] / base[9] < 0.95f){
+        kb.ki.wVk = 0x57; // virtual-key code for the A key
+        kb.ki.dwFlags = 0; // 0 for key press
+        SendInput(1, &kb, sizeof(INPUT));
+        return "PU";
+    }
+
+
+    if (current[1] / base[1] > 1.2f && 0.95f < angleCurrent / angleBase < 1.05f) {
         if (current[2] / base[2] < 1.2f) {
-            printf("YL ");
+            kb.ki.wVk = 0x41; // virtual-key code for the A key
+            kb.ki.dwFlags = 0; // 0 for key press
+            SendInput(1, &kb, sizeof(INPUT));
+            return "YL";
  
         }
     }
-    else if (current[2] / base[2] > 1.2f) {
+    else if (current[2] / base[2] > 1.2f && 0.95f < angleCurrent / angleBase < 1.05f) {
         if (current[1] / base[1] < 1.2f) {
-            printf("YR ");
+            kb.ki.wVk = 0x44; // virtual-key code for the D key
+            kb.ki.dwFlags = 0; // 0 for key press
+            SendInput(1, &kb, sizeof(INPUT));
+            return"YR";
 
         }
     }
+
+    kb.ki.wVk = 0x44;
+    kb.ki.dwFlags = KEYEVENTF_KEYUP; // KEYEVENTF_KEYUP for key release
+    SendInput(1, &kb, sizeof(INPUT));
+    kb.ki.wVk = 0x41;
+    kb.ki.dwFlags = KEYEVENTF_KEYUP;
+    SendInput(1, &kb, sizeof(INPUT));
+    kb.ki.wVk = 0x53; 
+    kb.ki.dwFlags = KEYEVENTF_KEYUP;
+    SendInput(1, &kb, sizeof(INPUT));
+    kb.ki.wVk = 0x57;
+    kb.ki.dwFlags = KEYEVENTF_KEYUP;
+    SendInput(1, &kb, sizeof(INPUT));
+
+    return "None";
 
 }
 
 // Saves landmarks in current frame
-vector<float> saveBaseLandmarks(vector<vector<Point2f>> shapes) {
+vector<float> saveBaseLandmarks(vector<vector<Point2f>> shapes, Rect face) {
     vector<vector<Point2f>> base = shapes;
-    vector<float> vals = calculateVals(base);
+    vector<float> vals = calculateVals(base, face);
     return vals;
 }
 
@@ -128,11 +179,15 @@ void printVals(vector<vector<Point2f>> current) {
 int main(int, char**){
 #define TRAINING false
 
-    INPUT ip;
-    ip.type = INPUT_KEYBOARD;
-    ip.ki.wScan = 0;
-    ip.ki.time = 0;
-    ip.ki.dwExtraInfo = 0;
+    INPUT kb;
+    kb.type = INPUT_KEYBOARD;
+    kb.ki.wScan = 0;
+    kb.ki.time = 0;
+    kb.ki.dwExtraInfo = 0;
+
+    INPUT ms;
+    ms.type = INPUT_MOUSE;
+
 
     // open the first webcam plugged in the computer
     VideoCapture camera(0);
@@ -160,6 +215,8 @@ int main(int, char**){
         return -1;
     }
 
+#define LOAD_PROFILE false
+#if LOAD_PROFILE
     // load cascade for profile face detection
     const String profile_cascade_name = "C:/lib/opencv/data/haarcascades/haarcascade_profileface.xml";
     CascadeClassifier profile_face_cascade;
@@ -168,6 +225,7 @@ int main(int, char**){
         cerr << "Cannot load cascade classifier from file: " << profile_cascade_name << endl;
         return -1;
     }
+#endif
 
     const string facemark_filename = "C:/lib/opencv/data/landmark_models/lbfmodel.yaml";
     Ptr<Facemark> facemark = createFacemarkLBF();
@@ -175,7 +233,7 @@ int main(int, char**){
     cout << "Loaded facemark LBF model" << endl;
 
     vector<vector<Point2f>> shapes;
-    vector<float> base = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    vector<float> base = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 #if TRAINING
     int i = 1;
@@ -228,10 +286,11 @@ int main(int, char**){
 #endif
 
 #if not TRAINING
-    while(1) {
+    while (1) {
+
         // capture the next frame from the webcam
         camera >> frame;
-        
+
         // The cascade classifier works best on grayscale images
         cvtColor(frame, gray, COLOR_BGR2GRAY);
 
@@ -246,11 +305,19 @@ int main(int, char**){
                 // Draw the detected landmarks
                 drawFacemarks(frame, shapes[0], cv::Scalar(0, 0, 255));
             }
+
             // printf("%f, %f \n", shapes[0][67].x, shapes[0][67].y);
 
-            if (cv::waitKey(1) == 32) base = saveBaseLandmarks(shapes);
-            calculateMovements(base, calculateVals(shapes), ip);
+            if (cv::waitKey(1) == 32) base = saveBaseLandmarks(shapes, faces[0]);
+
+            putText(frame, calculateMovements(base, calculateVals(shapes, faces[0]), kb, ms), Point2f(faces[0].x, faces[0].y + faces[0].height), 0, 1.0, Scalar(255, 255, 255), 2);
         }
+
+        else{
+            Sleep(1);
+        }
+
+#if 0
         else {
             faceDetector(gray, faces, profile_face_cascade);
             if (faces.size() != 0) {
@@ -262,8 +329,8 @@ int main(int, char**){
                     drawFacemarks(frame, shapes[0], cv::Scalar(0, 0, 255));
                 }
 
-                if (cv::waitKey(1) == 32) base = saveBaseLandmarks(shapes);
-                calculateMovements(base, calculateVals(shapes), ip);
+                if (cv::waitKey(1) == 32) base = saveBaseLandmarks(shapes, faces[0].area());
+                calculateMovements(base, calculateVals(shapes, faces[0].area()), ip);
             }
             else {
                 flip(gray, flipped, 1);
@@ -278,17 +345,16 @@ int main(int, char**){
                         drawFacemarks(frame, shapes[0], cv::Scalar(0, 0, 255));
                     }
 
-                    if (cv::waitKey(1) == 32) base = saveBaseLandmarks(shapes);
-                    calculateMovements(base, calculateVals(shapes), ip);
+                    if (cv::waitKey(1) == 32) base = saveBaseLandmarks(shapes, faces[0].area());
+                    calculateMovements(base, calculateVals(shapes, faces[0].area()), ip);
                 }
             }
         }
+#endif
         
 
         // show the image on the window
         imshow("Webcam", frame);
-
-        if(cv::waitKey(1) == 27) break;
 
     }
 #endif
