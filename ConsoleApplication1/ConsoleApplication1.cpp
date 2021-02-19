@@ -176,7 +176,7 @@ void printVals(vector<vector<Point2f>> current) {
     }
 }
 
-int main(int, char**){
+int main(int, char**) {
 #define TRAINING false
 
     INPUT kb;
@@ -191,7 +191,7 @@ int main(int, char**){
 
     // open the first webcam plugged in the computer
     VideoCapture camera(0);
-    if (!camera.isOpened()){
+    if (!camera.isOpened()) {
         cerr << "ERROR: Could not open camera" << endl;
         return 1;
     }
@@ -203,6 +203,7 @@ int main(int, char**){
     Mat frame;
     Mat gray;
     Mat flipped;
+    Mat reduced;
 
     vector<Rect> faces;
 
@@ -233,7 +234,9 @@ int main(int, char**){
     cout << "Loaded facemark LBF model" << endl;
 
     vector<vector<Point2f>> shapes;
-    vector<float> base = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    vector<float> base = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+
+    Rect lastFace;
 
 #if TRAINING
     int i = 1;
@@ -287,55 +290,46 @@ int main(int, char**){
 
 #if not TRAINING
     while (1) {
+        try {
 
-        // capture the next frame from the webcam
-        camera >> frame;
+            // capture the next frame from the webcam
+            camera >> frame;
 
-        // The cascade classifier works best on grayscale images
-        cvtColor(frame, gray, COLOR_BGR2GRAY);
+            reduced = frame;
+            resize(reduced, frame, Size(320, 200));
 
-        // ... obtain an image in img
-        faceDetector(gray, faces, face_cascade);
-        // Check if faces detected or not
-        if (faces.size() != 0) {
-            // We assume a single face so we look at the first only
-            cv::rectangle(frame, faces[0], Scalar(255, 0, 0), 2);
 
-            if (facemark->fit(gray, faces, shapes)) {
-                // Draw the detected landmarks
-                drawFacemarks(frame, shapes[0], cv::Scalar(0, 0, 255));
-            }
+            // The cascade classifier works best on grayscale images
+            cvtColor(frame, gray, COLOR_BGR2GRAY);
 
-            // printf("%f, %f \n", shapes[0][67].x, shapes[0][67].y);
-
-            if (cv::waitKey(1) == 32) base = saveBaseLandmarks(shapes, faces[0]);
-
-            putText(frame, calculateMovements(base, calculateVals(shapes, faces[0]), kb, ms), Point2f(faces[0].x, faces[0].y + faces[0].height), 0, 1.0, Scalar(255, 255, 255), 2);
-        }
-
-        else{
-            Sleep(1);
-        }
-
-#if 0
-        else {
-            faceDetector(gray, faces, profile_face_cascade);
+            // ... obtain an image in img
+            faceDetector(gray, faces, face_cascade);
+            // Check if faces detected or not
             if (faces.size() != 0) {
                 // We assume a single face so we look at the first only
-                cv::rectangle(frame, faces[0], Scalar(0, 255, 0), 2);
+                cv::rectangle(frame, faces[0], Scalar(255, 0, 0), 2);
+
+                lastFace = Rect(faces[0].x + 15, faces[0].y + 15, faces[0].width + 30, faces[0].height + 30);
 
                 if (facemark->fit(gray, faces, shapes)) {
                     // Draw the detected landmarks
                     drawFacemarks(frame, shapes[0], cv::Scalar(0, 0, 255));
                 }
 
-                if (cv::waitKey(1) == 32) base = saveBaseLandmarks(shapes, faces[0].area());
-                calculateMovements(base, calculateVals(shapes, faces[0].area()), ip);
-            }
-            else {
-                flip(gray, flipped, 1);
-                faceDetector(flipped, faces, profile_face_cascade);
+                // printf("%f, %f \n", shapes[0][67].x, shapes[0][67].y);
 
+                if (cv::waitKey(1) == 32) base = saveBaseLandmarks(shapes, faces[0]);
+
+                putText(frame, calculateMovements(base, calculateVals(shapes, faces[0]), kb, ms), Point2f(faces[0].x, faces[0].y + faces[0].height), 0, 1.0, Scalar(255, 255, 255), 2);
+            }
+
+            else {
+                Sleep(1);
+            }
+
+#if 0
+            else {
+                faceDetector(gray, faces, profile_face_cascade);
                 if (faces.size() != 0) {
                     // We assume a single face so we look at the first only
                     cv::rectangle(frame, faces[0], Scalar(0, 255, 0), 2);
@@ -348,17 +342,36 @@ int main(int, char**){
                     if (cv::waitKey(1) == 32) base = saveBaseLandmarks(shapes, faces[0].area());
                     calculateMovements(base, calculateVals(shapes, faces[0].area()), ip);
                 }
-            }
-        }
-#endif
-        
+                else {
+                    flip(gray, flipped, 1);
+                    faceDetector(flipped, faces, profile_face_cascade);
 
-        // show the image on the window
-        imshow("Webcam", frame);
+                    if (faces.size() != 0) {
+                        // We assume a single face so we look at the first only
+                        cv::rectangle(frame, faces[0], Scalar(0, 255, 0), 2);
+
+                        if (facemark->fit(gray, faces, shapes)) {
+                            // Draw the detected landmarks
+                            drawFacemarks(frame, shapes[0], cv::Scalar(0, 0, 255));
+                        }
+
+                        if (cv::waitKey(1) == 32) base = saveBaseLandmarks(shapes, faces[0].area());
+                        calculateMovements(base, calculateVals(shapes, faces[0].area()), ip);
+                    }
+                }
+            }
+#endif
+            // show the image on the window
+            imshow("Webcam", frame);
+
+        }
+        catch (Exception e) {
+            cout << e.what() << endl;
+        }
 
     }
 #endif
-      
+
 
     return 0;
 }
