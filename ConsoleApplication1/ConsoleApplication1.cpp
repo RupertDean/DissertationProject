@@ -42,8 +42,7 @@ vector<float> calculateVals(vector<vector<Point2f>> current, Rect face){
         dist(current[0][43], current[0][47]) + dist(current[0][44], current[0][46]),
     dist(current[0][1], current[0][30]) + dist(current[0][3], current[0][48]),
     dist(current[0][30], current[0][15]) + dist(current[0][54], current[0][13]),
-    dist(current[0][50], current[0][58]) + dist(current[0][51], current[0][57]) +
-        dist(current[0][52], current[0][56]),
+    dist(current[0][51], current[0][57]),
     dist(current[0][17], current[0][8]) + dist(current[0][26], current[0][8]),
     dist(current[0][17], current[0][30]) + dist(current[0][21], current[0][30]) +
         dist(current[0][22], current[0][30]) + dist(current[0][26], current[0][30]),
@@ -70,59 +69,53 @@ String calculateMovements(vector<float> base, vector<float> current, INPUT kb, I
     float angleCurrent = atan((current[11] - current[10])/(1.0f + current[10] * current[11])) * 180.0f / 3.4159265f;
     float angleBase = atan((base[11] - base[10]) / (1.0f + base[10] * base[11])) * 180.0f / 3.4159265f;
 
-    if (current[3] / base[3] > 1.15f) {
-        kb.ki.wVk = 0x20; // virtual-key code for the space key
-        kb.ki.dwFlags = 0; // 0 for key press
-        SendInput(1, &kb, sizeof(INPUT));
-
-        // Release the key
-        kb.ki.dwFlags = KEYEVENTF_KEYUP; // KEYEVENTF_KEYUP for key release
-        SendInput(1, &kb, sizeof(INPUT));
+    if (current[3] / base[3] > 1.3f) {
+        //mouse_event(MOUSEEVENTF_WHEEL, 0, 0, 1, 0);
     }
-
-    if (current[8] / base[8] < 0.85f) {
-        /**
-        kb.ki.wVk = 0x45; // virtual-key code for left click
-        kb.ki.dwFlags = 0; // 0 for key press
-        SendInput(1, &kb, sizeof(INPUT));
-        // Release the key
-        kb.ki.dwFlags = KEYEVENTF_KEYUP; // KEYEVENTF_KEYUP for key release
-        SendInput(1, &kb, sizeof(INPUT));
-        **/
-
-    }
-
+     
     if (angleCurrent / angleBase > 1.1f) {
-        
-        //return "RR";
+        ms.mi.dwFlags = MOUSEEVENTF_RIGHTDOWN;
+        SendInput(1, &ms, sizeof(INPUT));
+
+        Sleep(1);
+
+        ms.mi.dwFlags = MOUSEEVENTF_RIGHTUP;
+        SendInput(1, &ms, sizeof(INPUT));
+        return "RR";
     }
     else if (angleCurrent / angleBase < 0.9f) {
-        kb.ki.wVk = 0x1B; // virtual-key code for the ESC key
-        kb.ki.dwFlags = 0; // 0 for key press
-        SendInput(1, &kb, sizeof(INPUT));
+        ms.mi.dwFlags = MOUSEEVENTF_LEFTDOWN;
+        SendInput(1, &ms, sizeof(INPUT));
 
-        kb.ki.dwFlags = KEYEVENTF_KEYUP;
-        SendInput(1, &kb, sizeof(INPUT));
+        Sleep(1);
+
+        ms.mi.dwFlags = MOUSEEVENTF_LEFTUP;
+        SendInput(1, &ms, sizeof(INPUT));
+
         return "RL";
     }
 
 
     if (current[9] / base[9] > 1.05f) {
-        kb.ki.wVk = 0x53; // virtual-key code for the A key
+        kb.ki.wVk = 0x53; // virtual-key code for the S key
         kb.ki.dwFlags = 0; // 0 for key press
         SendInput(1, &kb, sizeof(INPUT));
         return "PD";
     }
     else if (current[9] / base[9] < 0.95f){
-        kb.ki.wVk = 0x57; // virtual-key code for the A key
+        kb.ki.wVk = 0x57; // virtual-key code for the W key
         kb.ki.dwFlags = 0; // 0 for key press
         SendInput(1, &kb, sizeof(INPUT));
         return "PU";
     }
 
+    if (current[8] / base[8] < 0.8f && 0.95f < current[9] / base[9] < 1.05f) {
+        
 
-    if (current[1] / base[1] > 1.2f && 0.95f < angleCurrent / angleBase < 1.05f) {
-        if (current[2] / base[2] < 1.2f) {
+    }
+
+    if (current[1] / base[1] > 1.2f && 0.9f < angleCurrent / angleBase < 1.1f) {
+        if (current[2] / base[2] < 1.1f) {
             kb.ki.wVk = 0x41; // virtual-key code for the A key
             kb.ki.dwFlags = 0; // 0 for key press
             SendInput(1, &kb, sizeof(INPUT));
@@ -130,8 +123,8 @@ String calculateMovements(vector<float> base, vector<float> current, INPUT kb, I
  
         }
     }
-    else if (current[2] / base[2] > 1.2f && 0.95f < angleCurrent / angleBase < 1.05f) {
-        if (current[1] / base[1] < 1.2f) {
+    else if (current[2] / base[2] > 1.2f && 0.9f < angleCurrent / angleBase < 1.1f) {
+        if (current[1] / base[1] < 1.1f) {
             kb.ki.wVk = 0x44; // virtual-key code for the D key
             kb.ki.dwFlags = 0; // 0 for key press
             SendInput(1, &kb, sizeof(INPUT));
@@ -179,13 +172,13 @@ void printVals(vector<vector<Point2f>> current) {
 int main(int, char**) {
 #define TRAINING false
 
-    INPUT kb;
+    INPUT kb = {};
     kb.type = INPUT_KEYBOARD;
     kb.ki.wScan = 0;
     kb.ki.time = 0;
     kb.ki.dwExtraInfo = 0;
 
-    INPUT ms;
+    INPUT ms = {};
     ms.type = INPUT_MOUSE;
 
 
@@ -295,8 +288,8 @@ int main(int, char**) {
             // capture the next frame from the webcam
             camera >> frame;
 
-            reduced = frame;
-            resize(reduced, frame, Size(320, 200));
+            //reduced = frame;
+            //resize(reduced, frame, Size(320, 200));
 
 
             // The cascade classifier works best on grayscale images
@@ -309,7 +302,7 @@ int main(int, char**) {
                 // We assume a single face so we look at the first only
                 cv::rectangle(frame, faces[0], Scalar(255, 0, 0), 2);
 
-                lastFace = Rect(faces[0].x + 15, faces[0].y + 15, faces[0].width + 30, faces[0].height + 30);
+                //lastFace = Rect(faces[0].x + 15, faces[0].y + 15, faces[0].width + 30, faces[0].height + 30);
 
                 if (facemark->fit(gray, faces, shapes)) {
                     // Draw the detected landmarks
