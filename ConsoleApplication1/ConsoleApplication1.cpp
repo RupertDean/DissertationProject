@@ -75,22 +75,22 @@ String calculateMovements(vector<float> base, vector<float> current, INPUT kb, I
      
     if (angleCurrent / angleBase > 1.1f) {
         ms.mi.dwFlags = MOUSEEVENTF_RIGHTDOWN;
-        SendInput(1, &ms, sizeof(INPUT));
+        //SendInput(1, &ms, sizeof(INPUT));
 
         Sleep(1);
 
         ms.mi.dwFlags = MOUSEEVENTF_RIGHTUP;
-        SendInput(1, &ms, sizeof(INPUT));
+        //SendInput(1, &ms, sizeof(INPUT));
         return "RR";
     }
     else if (angleCurrent / angleBase < 0.9f) {
         ms.mi.dwFlags = MOUSEEVENTF_LEFTDOWN;
-        SendInput(1, &ms, sizeof(INPUT));
+        //SendInput(1, &ms, sizeof(INPUT));
 
         Sleep(1);
 
         ms.mi.dwFlags = MOUSEEVENTF_LEFTUP;
-        SendInput(1, &ms, sizeof(INPUT));
+        //SendInput(1, &ms, sizeof(INPUT));
 
         return "RL";
     }
@@ -99,13 +99,13 @@ String calculateMovements(vector<float> base, vector<float> current, INPUT kb, I
     if (current[9] / base[9] > 1.05f) {
         kb.ki.wVk = 0x53; // virtual-key code for the S key
         kb.ki.dwFlags = 0; // 0 for key press
-        SendInput(1, &kb, sizeof(INPUT));
+        //SendInput(1, &kb, sizeof(INPUT));
         return "PD";
     }
     else if (current[9] / base[9] < 0.95f){
         kb.ki.wVk = 0x57; // virtual-key code for the W key
         kb.ki.dwFlags = 0; // 0 for key press
-        SendInput(1, &kb, sizeof(INPUT));
+        //SendInput(1, &kb, sizeof(INPUT));
         return "PU";
     }
 
@@ -118,7 +118,7 @@ String calculateMovements(vector<float> base, vector<float> current, INPUT kb, I
         if (current[2] / base[2] < 1.1f) {
             kb.ki.wVk = 0x41; // virtual-key code for the A key
             kb.ki.dwFlags = 0; // 0 for key press
-            SendInput(1, &kb, sizeof(INPUT));
+            //SendInput(1, &kb, sizeof(INPUT));
             return "YL";
  
         }
@@ -127,7 +127,7 @@ String calculateMovements(vector<float> base, vector<float> current, INPUT kb, I
         if (current[1] / base[1] < 1.1f) {
             kb.ki.wVk = 0x44; // virtual-key code for the D key
             kb.ki.dwFlags = 0; // 0 for key press
-            SendInput(1, &kb, sizeof(INPUT));
+            //SendInput(1, &kb, sizeof(INPUT));
             return"YR";
 
         }
@@ -135,16 +135,16 @@ String calculateMovements(vector<float> base, vector<float> current, INPUT kb, I
 
     kb.ki.wVk = 0x44;
     kb.ki.dwFlags = KEYEVENTF_KEYUP; // KEYEVENTF_KEYUP for key release
-    SendInput(1, &kb, sizeof(INPUT));
+    //SendInput(1, &kb, sizeof(INPUT));
     kb.ki.wVk = 0x41;
     kb.ki.dwFlags = KEYEVENTF_KEYUP;
-    SendInput(1, &kb, sizeof(INPUT));
+    //SendInput(1, &kb, sizeof(INPUT));
     kb.ki.wVk = 0x53; 
     kb.ki.dwFlags = KEYEVENTF_KEYUP;
-    SendInput(1, &kb, sizeof(INPUT));
+    //SendInput(1, &kb, sizeof(INPUT));
     kb.ki.wVk = 0x57;
     kb.ki.dwFlags = KEYEVENTF_KEYUP;
-    SendInput(1, &kb, sizeof(INPUT));
+    //SendInput(1, &kb, sizeof(INPUT));
 
     return "None";
 
@@ -190,7 +190,7 @@ int main(int, char**) {
     }
 
     // create a window to display the images from the webcam
-    namedWindow("Webcam");
+    namedWindow("Webcam", WINDOW_NORMAL);
 
     // this will contain the image from the webcam
     Mat frame;
@@ -230,6 +230,10 @@ int main(int, char**) {
     vector<float> base = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
     Rect lastFace;
+    bool cropped = false;
+    float offsetX, offsetY = 0, width = 0, height = 0;
+
+    constexpr int buffer = 30;
 
 #if TRAINING
     int i = 1;
@@ -283,44 +287,78 @@ int main(int, char**) {
 
 #if not TRAINING
     while (1) {
-        try {
-
             // capture the next frame from the webcam
             camera >> frame;
 
-            //reduced = frame;
-            //resize(reduced, frame, Size(320, 200));
-
+            if (cropped) {
+                reduced = frame(Rect(offsetX, offsetY, width, height));
+            }
+            else {
+                reduced = frame;
+            }
 
             // The cascade classifier works best on grayscale images
-            cvtColor(frame, gray, COLOR_BGR2GRAY);
+            cvtColor(reduced, gray, COLOR_BGR2GRAY);
 
             // ... obtain an image in img
             faceDetector(gray, faces, face_cascade);
             // Check if faces detected or not
-            if (faces.size() != 0) {
+            if (faces.size() > 0) {
                 // We assume a single face so we look at the first only
-                cv::rectangle(frame, faces[0], Scalar(255, 0, 0), 2);
+                cv::rectangle(reduced, faces[0], Scalar(255, 0, 0), 2);
 
-                //lastFace = Rect(faces[0].x + 15, faces[0].y + 15, faces[0].width + 30, faces[0].height + 30);
+                if (cropped) {
+                    offsetX += faces[0].x - buffer;
+                    offsetY += faces[0].y - buffer;
+                    width = faces[0].width + (2 * buffer);
+                    height = faces[0].height + (2 * buffer);
+                }
+                else {
+                    offsetX = faces[0].x - buffer;
+                    offsetY = faces[0].y - buffer;
+                    width = faces[0].width + (2 * buffer);
+                    height = faces[0].height + (2 * buffer);
+                    cropped = true;
+                }
+
+
+                if (offsetX < 0) {
+                    offsetX = 0;
+                }
+                else if (offsetX + width > frame.cols) {
+                    width -= ((offsetX + width) - frame.cols);
+                }
+                if (offsetY < 0) {
+                    offsetY = 0;
+                }
+                else if (offsetY + height > frame.rows) {
+                    offsetY -= ((offsetY + height) - frame.rows);
+                }
+
 
                 if (facemark->fit(gray, faces, shapes)) {
                     // Draw the detected landmarks
-                    drawFacemarks(frame, shapes[0], cv::Scalar(0, 0, 255));
+                    drawFacemarks(reduced, shapes[0], cv::Scalar(0, 0, 255));
                 }
 
                 // printf("%f, %f \n", shapes[0][67].x, shapes[0][67].y);
 
                 if (cv::waitKey(1) == 32) base = saveBaseLandmarks(shapes, faces[0]);
 
-                putText(frame, calculateMovements(base, calculateVals(shapes, faces[0]), kb, ms), Point2f(faces[0].x, faces[0].y + faces[0].height), 0, 1.0, Scalar(255, 255, 255), 2);
+                putText(reduced, calculateMovements(base, calculateVals(shapes, faces[0]), kb, ms), Point2f(faces[0].x, faces[0].y + faces[0].height), 0, 1.0, Scalar(255, 255, 255), 2);
             }
-
             else {
-                Sleep(1);
+                cout << "no face detected" << endl;
+                cropped = false;
+                offsetX = 0;
+                offsetY = 0;
+                width = 0;
+                height = 0;
             }
 
-#if 0
+            
+
+#if LOAD_PROFILE
             else {
                 faceDetector(gray, faces, profile_face_cascade);
                 if (faces.size() != 0) {
@@ -355,12 +393,13 @@ int main(int, char**) {
             }
 #endif
             // show the image on the window
-            imshow("Webcam", frame);
-
-        }
-        catch (Exception e) {
-            cout << e.what() << endl;
-        }
+            if (cropped) {
+                resizeWindow("Webcam", width, height);
+            }
+            else {
+                resizeWindow("Webcam", 640, 480);
+            }
+            imshow("Webcam", reduced);
 
     }
 #endif
