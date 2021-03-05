@@ -23,7 +23,7 @@ void faceDetector(const Mat& image, vector<Rect>& faces, CascadeClassifier& face
     face_cascade.detectMultiScale(
         image,
         faces,
-        2.0, // pyramid scale factor
+        1.5, // pyramid scale factor
         5,   // lower thershold for neighbors count
              // here we hint the classifier to only look for one face
         CASCADE_SCALE_IMAGE + CASCADE_FIND_BIGGEST_OBJECT);
@@ -35,7 +35,7 @@ float dist(Point2f a, Point2f b) {
 }
 
 // Returns a vector with distances between points on the face
-// 0 eyeDist, 1 leftCheek, 2 rightCheek, 3 mouthDist, 4 eyeToChin, 5 browDist, 6 browEyeWidth, 7 jawChinDist, 8 eyesOpen, 9 eyeBrowDist
+// 0 eyeDist, 1 leftCheek, 2 rightCheek, 3 mouthDist, 4 eyeToChin, 5 browDist, 6 browEyeWidth, 7 jawChinDist, 8 eyesOpen, 9 eyeBrowDist, 12 left eye, 13 right eye
 vector<float> calculateVals(vector<vector<Point2f>> current, Rect face){
     vector<float> vals = {
     dist(current[0][37], current[0][41]) + dist(current[0][38], current[0][40]) +
@@ -51,7 +51,10 @@ vector<float> calculateVals(vector<vector<Point2f>> current, Rect face){
     dist(current[0][37], current[0][41]) + dist(current[0][38], current[0][40]) +
         dist(current[0][43], current[0][47]) + dist(current[0][44], current[0][46]),
     current[0][8].y,
-        0, 0
+        0, 0,
+    dist(current[0][37], current[0][41]) + dist(current[0][38], current[0][40]),
+    dist(current[0][43], current[0][47]) + dist(current[0][44], current[0][46])
+
     };
 
     for (int i = 0; i < vals.size(); i++) {
@@ -109,9 +112,19 @@ String calculateMovements(vector<float> base, vector<float> current, INPUT kb, I
         return "PU";
     }
 
-    if (current[8] / base[8] < 0.8f && 0.95f < current[9] / base[9] < 1.05f) {
-        
+    if (current[10] / base[10] < 0.8f && 0.95f < current[9] / base[9] < 1.05f) {
 
+        return "LE";
+    }
+
+    if (current[11] / base[11] < 0.8f && 0.95f < current[9] / base[9] < 1.05f) {
+
+        return "RE";
+    }
+
+    if (current[8] / base[8] < 0.8f && 0.95f < current[9] / base[9] < 1.05f) {
+
+        return "EC";
     }
 
     if (current[1] / base[1] > 1.2f && 0.9f < angleCurrent / angleBase < 1.1f) {
@@ -227,7 +240,7 @@ int main(int, char**) {
     cout << "Loaded facemark LBF model" << endl;
 
     vector<vector<Point2f>> shapes;
-    vector<float> base = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    vector<float> base = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
     Rect lastFace;
     bool cropped = false;
