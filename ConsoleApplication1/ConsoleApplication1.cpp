@@ -1,13 +1,14 @@
-
 #define WINVER 0x0500
 
 #include "opencv2/opencv.hpp"
 #include "opencv2/face.hpp"
-#include "iostream"
 
 #include <windows.h>
+#include <iostream>
+#include <time.h>
 #include <fstream>
 #include <math.h>
+
 
 using namespace cv::face;
 using namespace std;
@@ -24,7 +25,7 @@ void faceDetector(const cv::Mat& image, vector<cv::Rect>& faces, cv::CascadeClas
         image,
         faces,
         1.5, // pyramid scale factor
-        5,   // lower thershold for neighbors count
+        3,   // lower thershold for neighbors count
              // here we hint the classifier to only look for one face
         cv::CASCADE_SCALE_IMAGE + cv::CASCADE_FIND_BIGGEST_OBJECT);
 }
@@ -35,25 +36,26 @@ float dist(cv::Point2f a, cv::Point2f b) {
 }
 
 // Returns a vector with distances between points on the face
-// 0 eyeDist, 1 leftCheek, 2 rightCheek, 3 mouthDist, 4 eyeToChin, 5 browDist, 6 browEyeWidth, 7 jawChinDist, 8 eyesOpen, 9 eyeBrowDist, 12 left eye, 13 right eye
-vector<float> calculateVals(vector<vector<cv::Point2f>> current, cv::Rect face) {
+// 0 and 1 for face angle, 2 left cheek, 3 right cheek, 4 eye to brow and mouth to chin, 5 mouth size
+// 6 left eye size, 7 right eye size
+vector<float> calculateVals(vector<cv::Point2f> current, cv::Rect face) {
     vector<float> vals = {
-    dist(current[0][37], current[0][41]) + dist(current[0][38], current[0][40]) +
-        dist(current[0][43], current[0][47]) + dist(current[0][44], current[0][46]),
-    dist(current[0][1], current[0][30]) + dist(current[0][3], current[0][48]),
-    dist(current[0][30], current[0][15]) + dist(current[0][54], current[0][13]),
-    dist(current[0][51], current[0][57]),
-    dist(current[0][17], current[0][8]) + dist(current[0][26], current[0][8]),
-    dist(current[0][17], current[0][30]) + dist(current[0][21], current[0][30]) +
-        dist(current[0][22], current[0][30]) + dist(current[0][26], current[0][30]),
-    dist(current[0][17], current[0][26]) + dist(current[0][36], current[0][45]),
-    dist(current[0][4], current[0][8]) + dist(current[0][12], current[0][8]),
-    dist(current[0][37], current[0][41]) + dist(current[0][38], current[0][40]) +
-        dist(current[0][43], current[0][47]) + dist(current[0][44], current[0][46]),
-    current[0][8].y,
-        0, 0,
-    dist(current[0][37], current[0][41]) + dist(current[0][38], current[0][40]),
-    dist(current[0][43], current[0][47]) + dist(current[0][44], current[0][46])
+    0, 0,
+
+    dist(current[0], current[36]) + dist(current[2], current[33]) + dist(current[4], current[48]),
+    
+    dist(current[16], current[45]) + dist(current[14], current[33]) + dist(current[12], current[54]),
+
+    dist(current[17], current[36]) + dist(current[19], current[37]) + dist(current[21], current[39]) +
+        dist(current[22], current[42]) + dist(current[24], current[44]) + dist(current[26], current[45])+
+        dist(current[5], current[48]) + dist(current[8], current[57]) + dist(current[11], current[54]),
+
+    (dist(current[50], current[58]) + dist(current[51], current[57]) + dist(current[52], current[56])) / 
+        dist(current[48], current[54]),
+
+    (dist(current[37], current[41]) + dist(current[38], current[40])) / dist(current[36], current[39]),
+
+    (dist(current[43], current[47]) + dist(current[44], current[46])) / dist(current[43], current[45])
 
     };
 
@@ -61,8 +63,8 @@ vector<float> calculateVals(vector<vector<cv::Point2f>> current, cv::Rect face) 
         vals[i] /= face.area();
     }
 
-    vals[10] = ((face.y + face.height) - face.y) / ((face.x + face.width) - face.x);
-    vals[11] = (current[0][0].y - current[0][16].y) / (current[0][0].x - current[0][16].x);
+    vals[0] = ((face.y + face.height) - face.y) / ((face.x + face.width) - face.x);
+    vals[1] = (current[0].y - current[16].y) / (current[0].x - current[16].x);
 
     return vals;
 }
@@ -70,108 +72,101 @@ vector<float> calculateVals(vector<vector<cv::Point2f>> current, cv::Rect face) 
 // Estimates movements based on differences in distances between base and current images
 cv::String calculateMovements(vector<float> base, vector<float> current, INPUT kb, INPUT ms) {
     POINT p;
-    float angleCurrent = atan((current[11] - current[10]) / (1.0f + current[10] * current[11])) * 180.0f / 3.4159265f;
-    float angleBase = atan((base[11] - base[10]) / (1.0f + base[10] * base[11])) * 180.0f / 3.4159265f;
+    float angleCurrent = atan((current[1] - current[0]) / (1.0f + current[0] * current[1])) * 180.0f / 3.4159265f;
+    float angleBase = atan((base[1] - base[0]) / (1.0f + base[0] * base[1])) * 180.0f / 3.4159265f;
+    
+    cv::String result = "";
 
-    if (current[3] / base[3] > 1.3f) {
-        //mouse_event(MOUSEEVENTF_WHEEL, 0, 0, 1, 0);
+
+    if (current[5] / base[5] > 1.3f) {
+        kb.ki.wVk = VK_SPACE; // virtual-key code for the space button
+        kb.ki.dwFlags = 0; // 0 for key press
+
+        SendInput(1, &kb, sizeof(INPUT));
+
+        result += "MO ";
     }
 
-    if (angleCurrent / angleBase > 1.1f) {
+    if (angleCurrent / angleBase > 1.2f) {
         ms.mi.dwFlags = MOUSEEVENTF_RIGHTDOWN;
-        //SendInput(1, &ms, sizeof(INPUT));
-
-        Sleep(1);
-
-        ms.mi.dwFlags = MOUSEEVENTF_RIGHTUP;
-        //SendInput(1, &ms, sizeof(INPUT));
-        //return "RR";
+        SendInput(1, &ms, sizeof(INPUT));
+       
+        result += "RR ";
     }
-    else if (angleCurrent / angleBase < 0.9f) {
+    else if (angleCurrent / angleBase < 0.8f) {
         ms.mi.dwFlags = MOUSEEVENTF_LEFTDOWN;
-        //SendInput(1, &ms, sizeof(INPUT));
+        SendInput(1, &ms, sizeof(INPUT));
 
-        Sleep(1);
+        result += "RL ";
+    }
+    else {
+        ms.mi.dwFlags = MOUSEEVENTF_RIGHTUP;
+        SendInput(1, &ms, sizeof(INPUT));
 
         ms.mi.dwFlags = MOUSEEVENTF_LEFTUP;
-        //SendInput(1, &ms, sizeof(INPUT));
-
-        //return "RL";
+        SendInput(1, &ms, sizeof(INPUT));
     }
 
 
-    if (current[9] / base[9] > 1.05f) {
-        kb.ki.wVk = 0x53; // virtual-key code for the S key
+    if (current[4] / base[4] < 0.9f) {
+
+        result += "PD ";
+    }
+    else if (current[4] / base[4] > 1.1f) {
+
+        result += "PU ";
+    }
+
+
+
+    if (current[6] / base[6] < 0.8f && current[7] / base[7] < 0.8f) {
+        kb.ki.wVk = 0x44; // virtual-key code for the A key
         kb.ki.dwFlags = 0; // 0 for key press
+
         //SendInput(1, &kb, sizeof(INPUT));
-        //return "PD";
+
+        result += "EC ";
     }
-    else if (current[9] / base[9] < 0.95f) {
-        kb.ki.wVk = 0x57; // virtual-key code for the W key
+    else if (current[6] / base[6] < 0.9f) {
+        kb.ki.wVk = 0x44; // virtual-key code for the A key
         kb.ki.dwFlags = 0; // 0 for key press
+
         //SendInput(1, &kb, sizeof(INPUT));
-        //return "PU";
+
+        result += "LE ";
+    }
+    else if (current[7] / base[7] < 0.9f) {
+        kb.ki.wVk = 0x45; // virtual-key code for the E key
+        kb.ki.dwFlags = 0; // 0 for key press
+
+        SendInput(1, &kb, sizeof(INPUT));
+
+        result += "RE ";
+    }
+  
+    
+    if (current[2] / base[2] < 0.9f && current[3] / base[3] > 1.05f) {
+        kb.ki.wVk = 0x44; // virtual-key code for the A key
+        kb.ki.dwFlags = 0; // 0 for key press
+
+        SendInput(1, &kb, sizeof(INPUT));
+    
+        result += "YR ";
+    }
+    else if (current[3] / base[3] < 0.9f && current[2] / base[2] > 1.05f) {
+        kb.ki.wVk = 0x41; // virtual-key code for the D key
+        kb.ki.dwFlags = 0; // 0 for key press
+        
+        SendInput(1, &kb, sizeof(INPUT));
+
+        result += "YL ";
     }
 
-    if (current[10] / base[10] < 0.8f && 0.95f < current[9] / base[9] < 1.05f) {
-
-        //return "LE";
+    if (result == "") {
+        return "None";
     }
 
-    if (current[11] / base[11] < 0.8f && 0.95f < current[9] / base[9] < 1.05f) {
-
-        //return "RE";
-    }
-
-    if (current[8] / base[8] < 0.8f && 0.95f < current[9] / base[9] < 1.05f) {
-
-        //return "EC";
-    }
-
-    if (current[1] / base[1] > 1.1f && 0.9f < angleCurrent / angleBase < 1.1f) {
-        if (current[2] / base[2] < 0.9f) {
-            kb.ki.wVk = 0x41; // virtual-key code for the A key
-            kb.ki.dwFlags = 0; // 0 for key press
-            //SendInput(1, &kb, sizeof(INPUT));
-
-            GetCursorPos(&p);
-            
-            SetCursorPos(p.x - (25 * ((current[1] / base[1]) -1)), p.y);
-
-            
-            return "YL";
-
-        }
-    }
-    else if (current[2] / base[2] > 1.1f && 0.9f < angleCurrent / angleBase < 1.1f) {
-        if (current[1] / base[1] < 0.9f) {
-            kb.ki.wVk = 0x44; // virtual-key code for the D key
-            kb.ki.dwFlags = 0; // 0 for key press
-            //SendInput(1, &kb, sizeof(INPUT));
-
-            GetCursorPos(&p);
-
-            SetCursorPos(p.x + (25 * ((current[2] / base[2]) -1)), p.y);
-
-            return"YR";
-
-        }
-    }
-
-    kb.ki.wVk = 0x44;
-    kb.ki.dwFlags = KEYEVENTF_KEYUP; // KEYEVENTF_KEYUP for key release
-    //SendInput(1, &kb, sizeof(INPUT));
-    kb.ki.wVk = 0x41;
-    kb.ki.dwFlags = KEYEVENTF_KEYUP;
-    //SendInput(1, &kb, sizeof(INPUT));
-    kb.ki.wVk = 0x53;
-    kb.ki.dwFlags = KEYEVENTF_KEYUP;
-    //SendInput(1, &kb, sizeof(INPUT));
-    kb.ki.wVk = 0x57;
-    kb.ki.dwFlags = KEYEVENTF_KEYUP;
-    //SendInput(1, &kb, sizeof(INPUT));
-
-    return "None";
+    return result;
 
 }
 
@@ -182,8 +177,8 @@ cv::String calculateMovementsRaw(vector<float> base, vector<float> current, INPU
 }
 
 // Saves landmarks in current frame
-vector<float> saveBaseLandmarks(vector<vector<cv::Point2f>> shapes, cv::Rect face) {
-    vector<vector<cv::Point2f>> base = shapes;
+vector<float> saveBaseLandmarks(vector<cv::Point2f> shapes, cv::Rect face) {
+    vector<cv::Point2f> base = shapes;
     vector<float> vals = calculateVals(base, face);
     return vals;
 }
@@ -202,6 +197,7 @@ void printVals(vector<vector<cv::Point2f>> current) {
 
 int main(int, char**) {
 #define TRAINING false
+#define LOAD_PROFILE false
 
     // Keyboard input device
     INPUT kb = {};
@@ -247,7 +243,6 @@ int main(int, char**) {
         return -1;
     }
 
-#define LOAD_PROFILE false
 #if LOAD_PROFILE
     // load cascade for profile face detection
     const String profile_cascade_name = "C:/lib/opencv/data/haarcascades/haarcascade_profileface.xml";
@@ -381,9 +376,9 @@ int main(int, char**) {
 
             // printf("%f, %f \n", shapes[0][67].x, shapes[0][67].y);
 
-            if (cv::waitKey(1) == 32) base = saveBaseLandmarks(shapes, faces[0]);
+            if (cv::waitKey(1) == 32) base = saveBaseLandmarks(shapes[0], faces[0]);
 
-            putText(reduced, calculateMovements(base, calculateVals(shapes, faces[0]), kb, ms), cv::Point2f(faces[0].x, faces[0].y + faces[0].height), 0, 1.0, cv::Scalar(255, 255, 255), 2);
+            putText(reduced, calculateMovements(base, calculateVals(shapes[0], faces[0]), kb, ms), cv::Point2f(faces[0].x, faces[0].y + faces[0].height), 0, 1.0, cv::Scalar(255, 255, 255), 2);
         }
         else {
             cout << "no face detected" << endl;
@@ -438,6 +433,7 @@ int main(int, char**) {
         cv::resizeWindow("Webcam", 640, 480);
     }
     imshow("Webcam", reduced);
+    cv::waitKey(1);
 
     }
 #endif
