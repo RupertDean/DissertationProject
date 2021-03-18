@@ -1,5 +1,4 @@
 #define WINVER 0x0500
-#define TRAINING false
 #define LOAD_PROFILE false
 #define CVUI_IMPLEMENTATION
 #define WINDOW_NAME "CVUI Hello World!"
@@ -91,23 +90,35 @@ cv::String calculateMovements(vector<float> base, vector<float> current, INPUT k
 	}
 
 	if (angleCurrent / angleBase > 1.2f) {
-		ms.mi.dwFlags = MOUSEEVENTF_RIGHTDOWN;
-		SendInput(1, &ms, sizeof(INPUT));
+		if ((GetKeyState(VK_RBUTTON) < 0) != 0) {
+			ms.mi.dwFlags = MOUSEEVENTF_RIGHTDOWN;
+			SendInput(1, &ms, sizeof(INPUT));
+
+			Sleep(1);
+		}
 
 		result += "RR ";
 	}
 	else if (angleCurrent / angleBase < 0.8f) {
-		ms.mi.dwFlags = MOUSEEVENTF_LEFTDOWN;
-		SendInput(1, &ms, sizeof(INPUT));
+		if ((GetKeyState(VK_LBUTTON) < 0) != 0) {
+			ms.mi.dwFlags = MOUSEEVENTF_LEFTDOWN;
+			SendInput(1, &ms, sizeof(INPUT));
+
+			Sleep(1);
+		}
 
 		result += "RL ";
 	}
 	else {
-		ms.mi.dwFlags = MOUSEEVENTF_RIGHTUP;
-		SendInput(1, &ms, sizeof(INPUT));
+		if ((GetKeyState(VK_RBUTTON) < 0) == 0) {
+			ms.mi.dwFlags = MOUSEEVENTF_RIGHTUP;
+			SendInput(1, &ms, sizeof(INPUT));
+		}
 
-		ms.mi.dwFlags = MOUSEEVENTF_LEFTUP;
-		SendInput(1, &ms, sizeof(INPUT));
+		if ((GetKeyState(VK_LBUTTON) < 0) == 0) {
+			ms.mi.dwFlags = MOUSEEVENTF_LEFTUP;
+			SendInput(1, &ms, sizeof(INPUT));
+		}
 	}
 
 
@@ -213,12 +224,16 @@ cv::String calculateMovementsRaw(vector<float> base, vector<float> current, INPU
 
 
 	if (current[4] / base[4] < 0.9f) {
+		GetCursorPos(&p);
 
+		SetCursorPos(p.x, p.y + (25 * ((current[2] / base[2]) - 1)));
 
 		result += "PD ";
 	}
 	else if (current[4] / base[4] > 1.1f) {
+		GetCursorPos(&p);
 
+		SetCursorPos(p.x, p.y - (25 * ((current[1] / base[1]) - 1)));
 
 		result += "PU ";
 	}
@@ -243,12 +258,16 @@ cv::String calculateMovementsRaw(vector<float> base, vector<float> current, INPU
 
 
 	if (current[2] / base[2] < 0.9f && current[3] / base[3] > 1.05f) {
-		
+		GetCursorPos(&p);
+
+		SetCursorPos(p.x + (25 * ((current[2] / base[2]) - 1)), p.y);
 
 		result += "YR ";
 	}
 	else if (current[3] / base[3] < 0.9f && current[2] / base[2] > 1.05f) {
-		
+		GetCursorPos(&p);
+
+		SetCursorPos(p.x - (25 * ((current[1] / base[1]) - 1)), p.y);
 
 		result += "YL ";
 	}
@@ -268,7 +287,7 @@ vector<float> saveBaseLandmarks(vector<cv::Point2f> shapes, cv::Rect face) {
 }
 
 int main(int, char**) {
-	cv::Mat window = cv::Mat(1000, 1000, CV_8UC3);
+	cv::Mat window = cv::Mat(480, 600, CV_8UC3);
 	int count = 0;
 
 	// Init a OpenCV window and tell cvui to use it.
@@ -341,66 +360,14 @@ int main(int, char**) {
 	constexpr int buffer = 30;
 
 	int mode = 1;
-	cv::String message;
+	bool paused = true;
+	int low_threshold = 1, high_threshold = 10;
+	cv::String message = "Paused";
 
 	while (true) {
 		// Fill the frame with a nice color
 		window = cv::Scalar(49, 52, 49);
 
-		// Update cvui internal stuff
-		cvui::update();
-
-#if TRAINING
-		int i = 1;
-
-		ofstream faces_csv;
-		faces_csv.open("Python_Part/faces.csv");
-
-		faces_csv << "num" + ',' + to_string(140) + ',' + "Pitch Up" + ',' + "Pitch Down" + ',' + "Roll Left" + ',' + "Roll Right" + ',' + "Yaw Left" + ',' + "Yaw Right" + ',' + "Mouth Open" + ',' + "Eyes Closed" + ",\n";
-
-		while (1) {
-			camera >> frame;
-
-			cvtColor(frame, gray, COLOR_BGR2GRAY);
-
-			// ... obtain an image in img
-			faceDetector(gray, faces, face_cascade);
-			// Check if faces detected or not
-			if (faces.size() != 0) {
-				// We assume a single face so we look at the first only
-				cv::rectangle(frame, faces[0], Scalar(255, 0, 0), 2);
-
-				if (facemark->fit(gray, faces, shapes)) {
-					// Draw the detected landmarks
-					drawFacemarks(frame, shapes[0], cv::Scalar(0, 0, 255));
-				}
-
-			}
-
-			imshow("Webcam", frame);
-
-			if (cv::waitKey(10) == 32) {
-				saveBaseLandmarks(shapes);
-
-				for (int i = 0; i < 68; i++) {
-					faces_csv << to_string(shapes[0][i].x) + ',' + to_string(shapes[0][i].y) + ',';
-				}
-
-				faces_csv << to_string(faces[0].x) + ',' + (to_string(faces[0].x) + to_string(faces[0].width));
-				faces_csv << to_string(faces[0].y) + ',' + (to_string(faces[0].y) + to_string(faces[0].height));
-
-				faces_csv << "\n";
-
-				i++;
-			}
-
-			if (cv::waitKey(1) == 27) break;
-		}
-
-		faces_csv.close();
-#endif
-
-#if not TRAINING
 		// capture the next frame from the webcam
 		camera >> frame;
 
@@ -459,11 +426,13 @@ int main(int, char**) {
 
 			if (cv::waitKey(1) == 32) base = saveBaseLandmarks(shapes[0], faces[0]);
 
-			if (mode == 1) {
-				message = calculateMovements(base, calculateVals(shapes[0], faces[0]), kb, ms);
-			}
-			else if (mode == -1) {
-				message = calculateMovementsRaw(base, calculateVals(shapes[0], faces[0]), kb, ms);
+			if (paused) {
+				if (mode == 1) {
+					message = calculateMovements(base, calculateVals(shapes[0], faces[0]), kb, ms);
+				}
+				else if (mode == -1) {
+					message = calculateMovementsRaw(base, calculateVals(shapes[0], faces[0]), kb, ms);
+				}
 			}
 
 			putText(reduced, message, cv::Point2f(faces[0].x, faces[0].y + faces[0].height), 0, 1.0, cv::Scalar(255, 255, 255), 2);
@@ -476,7 +445,6 @@ int main(int, char**) {
 			width = 0;
 			height = 0;
 		}
-
 
 
 #if LOAD_PROFILE
@@ -513,28 +481,46 @@ int main(int, char**) {
 			}
 		}
 #endif
+		cv::resize(reduced, frame, cv::Size(180, 180), 1, 1, 1);
+
+		cvui::beginRow(window, 10, 10);
+
+		cvui::image(window, 10, 50, frame);
+
+		cvui::endRow();
+
+		cvui::beginRow(window, 10, 200);
 
 		// Show a button at position (110, 80)
-		if (cvui::button(window, 110, 80, "Switch modes")) {
+		if (cvui::button(window, 110, 300, "Switch modes")) {
 			// The button was clicked, so let's increment our counter.
 			mode *= -1;
 		}
+		if (mode == 1) {
+			// Show control mode
+			// Text at position (250, 90), sized 0.4, in white
+			cvui::printf(window, 250, 350, 0.4, 0x000000, "Keyboard control", count);
+		}
+		else if (mode == -1) {
+			// Show control mode
+			// Text at position (250, 90), sized 0.4, in white
+			cvui::printf(window, 250, 350, 0.4, 0x000000, "Mouse control", count);
+		}
+		
+		cvui::checkbox(window, 15, 80, "Paused", &paused);
+		cvui::trackbar(window, 15, 110, 165, &low_threshold, 5, 150);
+		cvui::trackbar(window, 15, 180, 165, &high_threshold, 80, 300);
 
-		// Show how many times the button has been clicked.
-		// Text at position (250, 90), sized 0.4, in red.
-		cvui::printf(window, 250, 90, 0.4, 0xff0000, "Button click count: %d", count);
+		cvui::endRow();
 
+		cvui::update();
 
-		cv::resize(reduced, frame, cv::Size(200, 200), 200, 200, 1);
-		cvui::image(frame, 10, 10, window);
+		cv::imshow(WINDOW_NAME, window);
+
 		cv::waitKey(1);
-
-		// Show everything on the screen
-		cv::imshow(WINDOW_NAME, frame);
-
-#endif
 	}
 
 
 	return 0;
 }
+
