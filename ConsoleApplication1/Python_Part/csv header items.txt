@@ -1,1 +1,0 @@
-num	140	Pitch Up	Pitch Down	Roll Left	Roll Right	Yaw Left	Yaw Right	Mouth Open	Eyes Closed
