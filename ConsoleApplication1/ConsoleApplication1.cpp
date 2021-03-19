@@ -12,10 +12,51 @@
 #include <time.h>
 #include <fstream>
 #include <math.h>
+#include <conio.h>
+#include <algorithm>
 
 using namespace cv::face;
 using namespace std;
 
+
+int charFinderAlt(vector<int> keycodes, cv::Mat window, int x, int y) {
+	bool pressed = false;
+	int i = 0;
+	cvui::text(window, x, y, "Press a Different Key", 0.4, 0xff0000);
+
+	while (!pressed) {
+		cv::imshow(WINDOW_NAME, window);
+
+		for (; i < keycodes.size(); i++) {
+			if (GetAsyncKeyState(keycodes[i]) & 0x8000)
+			{
+				pressed = true;
+				break;
+			}
+		}
+
+		cv::waitKey(1);
+	}
+
+	return i;
+
+}
+
+int charFinder(vector<int> keycodes, cv::Mat window, int x, int y) {
+	cvui::text(window, x, y, "Press a Key", 0.4, 0xff0000);
+	cvui::update();
+	cv::imshow(WINDOW_NAME, window);
+
+	for (auto i = 0; i < keycodes.size(); i++) {
+		if (GetAsyncKeyState(keycodes[i]) & 0x8000)
+		{
+			return i;
+		}
+	}
+
+	return charFinderAlt(keycodes, window, x, y);
+
+}
 
 // Function to detect faces in given image
 void faceDetector(const cv::Mat& image, vector<cv::Rect>& faces, cv::CascadeClassifier& face_cascade) {
@@ -287,7 +328,7 @@ vector<float> saveBaseLandmarks(vector<cv::Point2f> shapes, cv::Rect face) {
 }
 
 int main(int, char**) {
-	cv::Mat window = cv::Mat(480, 600, CV_8UC3);
+	cv::Mat window = cv::Mat(480, 750, CV_8UC3);
 	int count = 0;
 
 	// Init a OpenCV window and tell cvui to use it.
@@ -324,38 +365,28 @@ int main(int, char**) {
 	cv::Mat reduced;
 
 	vector<cv::Rect> faces;
+	if (0) {
+		// load cascade for face detection
+		const cv::String cascade_name = "C:/lib/opencv/data/haarcascades/haarcascade_frontalface_default.xml";
+		cv::CascadeClassifier face_cascade;
 
-	// load cascade for face detection
-	const cv::String cascade_name = "C:/lib/opencv/data/haarcascades/haarcascade_frontalface_default.xml";
-	cv::CascadeClassifier face_cascade;
+		if (not face_cascade.load(cascade_name)) {
+			cerr << "Cannot load cascade classifier from file: " << cascade_name << endl;
+			return -1;
+		}
 
-	if (not face_cascade.load(cascade_name)) {
-		cerr << "Cannot load cascade classifier from file: " << cascade_name << endl;
-		return -1;
+		const string facemark_filename = "C:/lib/opencv/data/landmark_models/lbfmodel.yaml";
+		cv::Ptr<cv::face::Facemark> facemark = createFacemarkLBF();
+		facemark->loadModel(facemark_filename);
+		cout << "Loaded facemark LBF model" << endl;
 	}
-
-#if LOAD_PROFILE
-	// load cascade for profile face detection
-	const String profile_cascade_name = "C:/lib/opencv/data/haarcascades/haarcascade_profileface.xml";
-	CascadeClassifier profile_face_cascade;
-
-	if (not profile_face_cascade.load(profile_cascade_name)) {
-		cerr << "Cannot load cascade classifier from file: " << profile_cascade_name  << endl;
-		return -1;
-	}
-#endif
-
-	const string facemark_filename = "C:/lib/opencv/data/landmark_models/lbfmodel.yaml";
-	cv::Ptr<cv::face::Facemark> facemark = createFacemarkLBF();
-	facemark->loadModel(facemark_filename);
-	cout << "Loaded facemark LBF model" << endl;
 
 	vector<vector<cv::Point2f>> shapes;
 	vector<float> base = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
 	cv::Rect lastFace;
 	bool cropped = false;
-	float offsetX, offsetY = 0, width = 0, height = 0;
+	float offsetX = 0, offsetY = 0, width = 0, height = 0;
 
 	constexpr int buffer = 30;
 
@@ -363,6 +394,14 @@ int main(int, char**) {
 	bool paused = true;
 	int low_threshold = 1, high_threshold = 10;
 	cv::String message = "Paused";
+
+	vector<string> keybinds = { "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", 
+	"v", "w", "x", "y", "z", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "TAB", "CAPS LCK", "SHIFT", "CTRL", "ALT", "ENTER", "ESC",
+	"UP", "DOWN", "LEFT", "RIGHT", "MOUSE 1", "MOUSE 2", "MOUSE 3"};
+	vector<int> keycodes = { 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x49, 0x49, 0x4A, 0x4B, 0x4C, 0x4D,0x4E, 0x4F, 0x50, 0x51, 0x52,
+	0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5A, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x09, 0x14, 0x10, 0x11,
+	0x12, 0x0D, 0x1B, 0x26, 0x28, 0x25, 0x27, 0x01, 0x02, 0x03 };
+	int saved [10] = { 0, 4, 22, 18, 16, 4, 47, 48, 49, 42 };
 
 	while (true) {
 		// Fill the frame with a nice color
@@ -382,7 +421,7 @@ int main(int, char**) {
 		cvtColor(reduced, gray, cv::COLOR_BGR2GRAY);
 
 		// ... obtain an image in img
-		faceDetector(gray, faces, face_cascade);
+		/**faceDetector(gray, faces, face_cascade);
 		// Check if faces detected or not
 		if (faces.size() > 0) {
 			// We assume a single face so we look at the first only
@@ -444,74 +483,59 @@ int main(int, char**) {
 			offsetY = 0;
 			width = 0;
 			height = 0;
-		}
+		}**/
 
+		cv::resize(reduced, frame, cv::Size(210, 210), 1, 1, 1);
 
-#if LOAD_PROFILE
-		else {
-			faceDetector(gray, faces, profile_face_cascade);
-			if (faces.size() != 0) {
-				// We assume a single face so we look at the first only
-				cv::rectangle(frame, faces[0], Scalar(0, 255, 0), 2);
+		// Camera feed
+		cvui::image(window, 30, 60, frame);
 
-				if (facemark->fit(gray, faces, shapes)) {
-					// Draw the detected landmarks
-					drawFacemarks(frame, shapes[0], cv::Scalar(0, 0, 255));
-				}
+		// Sliders
+				
 
-				if (cv::waitKey(1) == 32) base = saveBaseLandmarks(shapes, faces[0].area());
-				calculateMovements(base, calculateVals(shapes, faces[0].area()), ip);
-			}
-			else {
-				flip(gray, flipped, 1);
-				faceDetector(flipped, faces, profile_face_cascade);
-
-				if (faces.size() != 0) {
-					// We assume a single face so we look at the first only
-					cv::rectangle(frame, faces[0], Scalar(0, 255, 0), 2);
-
-					if (facemark->fit(gray, faces, shapes)) {
-						// Draw the detected landmarks
-						drawFacemarks(frame, shapes[0], cv::Scalar(0, 0, 255));
-					}
-
-					if (cv::waitKey(1) == 32) base = saveBaseLandmarks(shapes, faces[0].area());
-					calculateMovements(base, calculateVals(shapes, faces[0].area()), ip);
-				}
-			}
-		}
-#endif
-		cv::resize(reduced, frame, cv::Size(180, 180), 1, 1, 1);
-
-		cvui::beginRow(window, 10, 10);
-
-		cvui::image(window, 10, 50, frame);
-
-		cvui::endRow();
-
-		cvui::beginRow(window, 10, 200);
-
-		// Show a button at position (110, 80)
-		if (cvui::button(window, 110, 300, "Switch modes")) {
-			// The button was clicked, so let's increment our counter.
+		// Control settings
+		if (cvui::button(window, 30, 280, 120, 30, "Switch modes")) {
 			mode *= -1;
 		}
 		if (mode == 1) {
 			// Show control mode
 			// Text at position (250, 90), sized 0.4, in white
-			cvui::printf(window, 250, 350, 0.4, 0x000000, "Keyboard control", count);
+			cvui::printf(window, 160, 290, 0.4, 0xffffff, "Keyboard control");
 		}
 		else if (mode == -1) {
 			// Show control mode
 			// Text at position (250, 90), sized 0.4, in white
-			cvui::printf(window, 250, 350, 0.4, 0x000000, "Mouse control", count);
+			cvui::printf(window, 160, 290, 0.4, 0xffffff, "Mouse control");
 		}
 		
-		cvui::checkbox(window, 15, 80, "Paused", &paused);
-		cvui::trackbar(window, 15, 110, 165, &low_threshold, 5, 150);
-		cvui::trackbar(window, 15, 180, 165, &high_threshold, 80, 300);
+		cvui::checkbox(window, 30, 320, "Paused", &paused);
 
-		cvui::endRow();
+		if (cvui::button(window, 100, 380, "Recalibrate")) {
+			base = saveBaseLandmarks(shapes[0], faces[0]);
+		} 
+
+		// Keybindings
+		cvui::printf(window, 320, 250, 0.4, 0xffffff, "Look Left");
+		if (cvui::button(window, 400, 250, 120, 30, keybinds[saved[0]])) saved[0] = charFinder(keycodes, window, 340, 275);
+		cvui::printf(window, 320, 300, 0.4, 0xffffff, "Look Right");
+		if (cvui::button(window, 400, 300, 120, 30, keybinds[saved[1]])) saved[1] = charFinder(keycodes, window, 340, 325);
+		cvui::printf(window, 320, 350, 0.4, 0xffffff, "Look Up");
+		if (cvui::button(window, 400, 350, 120, 30, keybinds[saved[2]])) saved[2] = charFinder(keycodes, window, 340, 375);
+		cvui::printf(window, 320, 400, 0.4, 0xffffff, "Look Down");
+		if (cvui::button(window, 400, 400, 120, 30, keybinds[saved[3]])) saved[3] = charFinder(keycodes, window, 340, 425);
+		cvui::printf(window, 320, 450, 0.4, 0xffffff, "Tilt Left");
+		if (cvui::button(window, 400, 450, 120, 30, keybinds[saved[4]])) saved[4] = charFinder(keycodes, window, 340, 475);
+		cvui::printf(window, 500, 250, 0.4, 0xffffff, "Tilt Right");
+		if (cvui::button(window, 580, 250, 120, 30, keybinds[saved[5]])) saved[5] = charFinder(keycodes, window, 520, 275);
+		cvui::printf(window, 500, 300, 0.4, 0xffffff, "Left Eye");
+		if (cvui::button(window, 580, 300, 120, 30, keybinds[saved[6]])) saved[6] = charFinder(keycodes, window, 520, 325);
+		cvui::printf(window, 500, 350, 0.4, 0xffffff, "Right Eye");
+		if (cvui::button(window, 580, 350, 120, 30, keybinds[saved[7]])) saved[7] = charFinder(keycodes, window, 520, 375);
+		cvui::printf(window, 500, 400, 0.4, 0xffffff, "Both Eyes");
+		if (cvui::button(window, 580, 400, 120, 30, keybinds[saved[8]])) saved[8] = charFinder(keycodes, window, 520, 425);
+		cvui::printf(window, 500, 450, 0.4, 0xffffff, "Mouth Open");
+		if (cvui::button(window, 580, 450, 120, 30, keybinds[saved[9]])) saved[9] = charFinder(keycodes, window, 520, 475);
+
 
 		cvui::update();
 
@@ -523,4 +547,3 @@ int main(int, char**) {
 
 	return 0;
 }
-
