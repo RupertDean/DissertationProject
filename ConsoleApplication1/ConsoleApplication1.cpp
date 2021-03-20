@@ -1,8 +1,10 @@
+// Define program constants
 #define WINVER 0x0500
 #define LOAD_PROFILE false
 #define CVUI_IMPLEMENTATION
 #define WINDOW_NAME "CVUI Hello World!"
 
+// Include modules and header files
 #include "opencv2/opencv.hpp"
 #include "opencv2/face.hpp"
 #include "cvui.h"
@@ -15,19 +17,22 @@
 #include <conio.h>
 #include <algorithm>
 
+// Namespaces
 using namespace cv::face;
 using namespace std;
 
-
-
+// Returns the index of a pressed key, given the key is listed in the arrays in main
 int charFinder(vector<int> keycodes, cv::Mat window) {
+	// Bool to loop while a key hasn't been recognised
 	bool pressed = false;
 	int i = 0;
 
 	while (!pressed) {
+		// Loop through available keys
 		for (i = 0; i < keycodes.size(); i++) {
-			if (GetAsyncKeyState(keycodes[i]) & 0x8000)
-			{
+			// If key is pressed down
+			if (GetAsyncKeyState(keycodes[i]) & 0x8000) {
+				// Break the loop
 				pressed = true;
 				break;
 			}
@@ -36,7 +41,7 @@ int charFinder(vector<int> keycodes, cv::Mat window) {
 		cv::waitKey(1);
 	}
 
-	printf("%d", i);
+	// Return index of key
 	return i;
 }
 
@@ -85,10 +90,12 @@ vector<float> calculateVals(vector<cv::Point2f> current, cv::Rect face) {
 
 	};
 
+	// Calculate area of bounding rectangle and normalise values
 	for (int i = 0; i < vals.size(); i++) {
 		vals[i] /= face.area();
 	}
 
+	// Values for calculating angle of head tilt
 	vals[0] = ((face.y + face.height) - face.y) / ((face.x + face.width) - face.x);
 	vals[1] = (current[0].y - current[16].y) / (current[0].x - current[16].x);
 
@@ -97,9 +104,11 @@ vector<float> calculateVals(vector<cv::Point2f> current, cv::Rect face) {
 
 // Estimates movements based on differences in distances between base and current images
 cv::String calculateMovements(vector<float> base, vector<float> current, INPUT kb, INPUT ms) {
+	// Calculate angles of head tilt
 	float angleCurrent = atan((current[1] - current[0]) / (1.0f + current[0] * current[1])) * 180.0f / 3.4159265f;
 	float angleBase = atan((base[1] - base[0]) / (1.0f + base[0] * base[1])) * 180.0f / 3.4159265f;
 
+	// String to store movements
 	cv::String result = "";
 
 
@@ -207,8 +216,8 @@ cv::String calculateMovements(vector<float> base, vector<float> current, INPUT k
 
 }
 
-// Same as previous function but uses raw input
-cv::String calculateMovementsRaw(vector<float> base, vector<float> current, INPUT kb, INPUT ms) {
+// Same as previous function but for mouse movement
+cv::String calculateMovementsMouse(vector<float> base, vector<float> current, INPUT kb, INPUT ms) {
 	POINT p;
 	float angleCurrent = atan((current[1] - current[0]) / (1.0f + current[0] * current[1])) * 180.0f / 3.4159265f;
 	float angleBase = atan((base[1] - base[0]) / (1.0f + base[0] * base[1])) * 180.0f / 3.4159265f;
@@ -310,6 +319,8 @@ vector<float> saveBaseLandmarks(vector<cv::Point2f> shapes, cv::Rect face) {
 }
 
 int main(int, char**) {
+	// Pre Reqs
+#if 1
 	cv::Mat window = cv::Mat(480, 750, CV_8UC3);
 	int count = 0;
 
@@ -388,6 +399,9 @@ int main(int, char**) {
 	int mouseSens = 1.0f;
 	int thresholdSens = 1.0f;
 
+#endif
+
+	// Main Process Loop
 	while (true) {
 		// Fill the frame with a nice color
 		window = cv::Scalar(49, 52, 49);
@@ -395,9 +409,12 @@ int main(int, char**) {
 		// capture the next frame from the webcam
 		camera >> frame;
 
+		// If a face has been found in the last frame
 		if (cropped) {
+			// Crop frame to area around face
 			reduced = frame(cv::Rect(offsetX, offsetY, width, height));
 		}
+		// Otherwise use the whole image
 		else {
 			reduced = frame;
 		}
@@ -455,7 +472,7 @@ int main(int, char**) {
 					message = calculateMovements(base, calculateVals(shapes[0], faces[0]), kb, ms);
 				}
 				else if (mode == -1) {
-					message = calculateMovementsRaw(base, calculateVals(shapes[0], faces[0]), kb, ms);
+					message = calculateMovementsMouse(base, calculateVals(shapes[0], faces[0]), kb, ms);
 				}
 			}
 
@@ -470,6 +487,7 @@ int main(int, char**) {
 			height = 0;
 		}**/
 
+		// Resize the material 
 		cv::resize(reduced, frame, cv::Size(210, 210), 1, 1, 1);
 
 		// Camera feed
@@ -593,8 +611,8 @@ int main(int, char**) {
 
 #endif
 
+		// Update and display elements
 		cvui::update();
-
 		cv::imshow(WINDOW_NAME, window);
 
 		cv::waitKey(1);
