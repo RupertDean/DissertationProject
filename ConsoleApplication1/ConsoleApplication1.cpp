@@ -19,15 +19,13 @@ using namespace cv::face;
 using namespace std;
 
 
-int charFinderAlt(vector<int> keycodes, cv::Mat window, int x, int y) {
+
+int charFinder(vector<int> keycodes, cv::Mat window) {
 	bool pressed = false;
 	int i = 0;
-	cvui::text(window, x, y, "Press a Different Key", 0.4, 0xff0000);
 
 	while (!pressed) {
-		cv::imshow(WINDOW_NAME, window);
-
-		for (; i < keycodes.size(); i++) {
+		for (i = 0; i < keycodes.size(); i++) {
 			if (GetAsyncKeyState(keycodes[i]) & 0x8000)
 			{
 				pressed = true;
@@ -38,24 +36,8 @@ int charFinderAlt(vector<int> keycodes, cv::Mat window, int x, int y) {
 		cv::waitKey(1);
 	}
 
+	printf("%d", i);
 	return i;
-
-}
-
-int charFinder(vector<int> keycodes, cv::Mat window, int x, int y) {
-	cvui::text(window, x, y, "Press a Key", 0.4, 0xff0000);
-	cvui::update();
-	cv::imshow(WINDOW_NAME, window);
-
-	for (auto i = 0; i < keycodes.size(); i++) {
-		if (GetAsyncKeyState(keycodes[i]) & 0x8000)
-		{
-			return i;
-		}
-	}
-
-	return charFinderAlt(keycodes, window, x, y);
-
 }
 
 // Function to detect faces in given image
@@ -282,17 +264,17 @@ cv::String calculateMovementsRaw(vector<float> base, vector<float> current, INPU
 
 
 	if (current[6] / base[6] < 0.8f && current[7] / base[7] < 0.8f) {
-		
+
 
 		result += "EC ";
 	}
 	else if (current[6] / base[6] < 0.9f) {
-		
+
 
 		result += "LE ";
 	}
 	else if (current[7] / base[7] < 0.9f) {
-		
+
 
 		result += "RE ";
 	}
@@ -395,13 +377,16 @@ int main(int, char**) {
 	int low_threshold = 1, high_threshold = 10;
 	cv::String message = "Paused";
 
-	vector<string> keybinds = { "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", 
-	"v", "w", "x", "y", "z", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "TAB", "CAPS LCK", "SHIFT", "CTRL", "ALT", "ENTER", "ESC",
-	"UP", "DOWN", "LEFT", "RIGHT", "MOUSE 1", "MOUSE 2", "MOUSE 3"};
+	vector<string> keybinds = { "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U",
+	"V", "W", "X", "Y", "Z", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "TAB", "CAPS LCK", "SHIFT", "CTRL", "ALT", "ENTER", "ESC",
+	"UP", "DOWN", "LEFT", "RIGHT", "MOUSE 1", "MOUSE 2", "MOUSE 3", "SPACE" };
 	vector<int> keycodes = { 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x49, 0x49, 0x4A, 0x4B, 0x4C, 0x4D,0x4E, 0x4F, 0x50, 0x51, 0x52,
 	0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5A, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x09, 0x14, 0x10, 0x11,
-	0x12, 0x0D, 0x1B, 0x26, 0x28, 0x25, 0x27, 0x01, 0x02, 0x03 };
-	int saved [10] = { 0, 4, 22, 18, 16, 4, 47, 48, 49, 42 };
+	0x12, 0x0D, 0x1B, 0x26, 0x28, 0x25, 0x27, 0x01, 0x02, 0x03, 0x20 };
+	int saved[10] = { 0, 4, 22, 18, 16, 4, 47, 48, 49, 42 };
+
+	int mouseSens = 1.0f;
+	int thresholdSens = 1.0f;
 
 	while (true) {
 		// Fill the frame with a nice color
@@ -488,12 +473,20 @@ int main(int, char**) {
 		cv::resize(reduced, frame, cv::Size(210, 210), 1, 1, 1);
 
 		// Camera feed
-		cvui::image(window, 30, 60, frame);
+		cvui::image(window, 30, 30, frame);
 
 		// Sliders
-				
+#if 1
+		cvui::text(window, 350, 60, "Mouse Sensitivity", 0.4f, 0xffffff);
+		cvui::trackbar(window, 475, 60, 250, &mouseSens, 1, 10, 0.1f);
+
+		cvui::text(window, 350, 150, "Mouse Sensitivity", 0.4f, 0xffffff);
+		cvui::trackbar(window, 475, 150, 250, &thresholdSens, 1, 10, 0.1f);
+
+#endif
 
 		// Control settings
+#if 1
 		if (cvui::button(window, 30, 280, 120, 30, "Switch modes")) {
 			mode *= -1;
 		}
@@ -507,35 +500,98 @@ int main(int, char**) {
 			// Text at position (250, 90), sized 0.4, in white
 			cvui::printf(window, 160, 290, 0.4, 0xffffff, "Mouse control");
 		}
-		
+
 		cvui::checkbox(window, 30, 320, "Paused", &paused);
 
 		if (cvui::button(window, 100, 380, "Recalibrate")) {
 			base = saveBaseLandmarks(shapes[0], faces[0]);
-		} 
+		}
+#endif
 
 		// Keybindings
-		cvui::printf(window, 320, 250, 0.4, 0xffffff, "Look Left");
-		if (cvui::button(window, 400, 250, 120, 30, keybinds[saved[0]])) saved[0] = charFinder(keycodes, window, 340, 275);
-		cvui::printf(window, 320, 300, 0.4, 0xffffff, "Look Right");
-		if (cvui::button(window, 400, 300, 120, 30, keybinds[saved[1]])) saved[1] = charFinder(keycodes, window, 340, 325);
-		cvui::printf(window, 320, 350, 0.4, 0xffffff, "Look Up");
-		if (cvui::button(window, 400, 350, 120, 30, keybinds[saved[2]])) saved[2] = charFinder(keycodes, window, 340, 375);
-		cvui::printf(window, 320, 400, 0.4, 0xffffff, "Look Down");
-		if (cvui::button(window, 400, 400, 120, 30, keybinds[saved[3]])) saved[3] = charFinder(keycodes, window, 340, 425);
-		cvui::printf(window, 320, 450, 0.4, 0xffffff, "Tilt Left");
-		if (cvui::button(window, 400, 450, 120, 30, keybinds[saved[4]])) saved[4] = charFinder(keycodes, window, 340, 475);
-		cvui::printf(window, 500, 250, 0.4, 0xffffff, "Tilt Right");
-		if (cvui::button(window, 580, 250, 120, 30, keybinds[saved[5]])) saved[5] = charFinder(keycodes, window, 520, 275);
-		cvui::printf(window, 500, 300, 0.4, 0xffffff, "Left Eye");
-		if (cvui::button(window, 580, 300, 120, 30, keybinds[saved[6]])) saved[6] = charFinder(keycodes, window, 520, 325);
-		cvui::printf(window, 500, 350, 0.4, 0xffffff, "Right Eye");
-		if (cvui::button(window, 580, 350, 120, 30, keybinds[saved[7]])) saved[7] = charFinder(keycodes, window, 520, 375);
-		cvui::printf(window, 500, 400, 0.4, 0xffffff, "Both Eyes");
-		if (cvui::button(window, 580, 400, 120, 30, keybinds[saved[8]])) saved[8] = charFinder(keycodes, window, 520, 425);
-		cvui::printf(window, 500, 450, 0.4, 0xffffff, "Mouth Open");
-		if (cvui::button(window, 580, 450, 120, 30, keybinds[saved[9]])) saved[9] = charFinder(keycodes, window, 520, 475);
+#if 1
+		cvui::printf(window, 300, 245, 0.4, 0xffffff, "Look Left");
+		if (cvui::button(window, 380, 240, 100, 30, keybinds[saved[0]])) {
+			cvui::text(window, 340, 275, "Press a Key", 0.4, 0xff0000);
+			cvui::update();
+			cv::imshow(WINDOW_NAME, window);
 
+			saved[0] = charFinder(keycodes, window);
+		}
+		cvui::printf(window, 300, 295, 0.4, 0xffffff, "Look Right");
+		if (cvui::button(window, 380, 290, 100, 30, keybinds[saved[1]])) {
+			cvui::text(window, 340, 325, "Press a Key", 0.4, 0xff0000);
+			cvui::update();
+			cv::imshow(WINDOW_NAME, window);
+
+			saved[1] = charFinder(keycodes, window);
+		}
+		cvui::printf(window, 300, 345, 0.4, 0xffffff, "Look Up");
+		if (cvui::button(window, 380, 340, 100, 30, keybinds[saved[2]])) {
+			cvui::text(window, 340, 375, "Press a Key", 0.4, 0xff0000);
+			cvui::update();
+			cv::imshow(WINDOW_NAME, window);
+
+			saved[2] = charFinder(keycodes, window);
+		}
+		cvui::printf(window, 300, 395, 0.4, 0xffffff, "Look Down");
+		if (cvui::button(window, 380, 390, 100, 30, keybinds[saved[3]])) {
+			cvui::text(window, 340, 425, "Press a Key", 0.4, 0xff0000);
+			cvui::update();
+			cv::imshow(WINDOW_NAME, window);
+
+			saved[3] = charFinder(keycodes, window);
+		}
+		cvui::printf(window, 300, 445, 0.4, 0xffffff, "Tilt Left");
+		if (cvui::button(window, 380, 440, 100, 30, keybinds[saved[4]])) {
+			cvui::text(window, 340, 475, "Press a Key", 0.4, 0xff0000);
+			cvui::update();
+			cv::imshow(WINDOW_NAME, window);
+
+			saved[4] = charFinder(keycodes, window);
+		}
+		cvui::printf(window, 500, 245, 0.4, 0xffffff, "Tilt Right");
+		if (cvui::button(window, 580, 240, 100, 30, keybinds[saved[5]])) {
+			cvui::text(window, 520, 275, "Press a Key", 0.4, 0xff0000);
+			cvui::update();
+			cv::imshow(WINDOW_NAME, window);
+
+			saved[5] = charFinder(keycodes, window);
+		}
+		cvui::printf(window, 500, 295, 0.4, 0xffffff, "Left Eye");
+		if (cvui::button(window, 580, 290, 100, 30, keybinds[saved[6]])) {
+			cvui::text(window, 520, 325, "Press a Key", 0.4, 0xff0000);
+			cvui::update();
+			cv::imshow(WINDOW_NAME, window);
+
+			saved[6] = charFinder(keycodes, window);
+		}
+		cvui::printf(window, 500, 345, 0.4, 0xffffff, "Right Eye");
+		if (cvui::button(window, 580, 340, 100, 30, keybinds[saved[7]])) {
+			cvui::text(window, 520, 375, "Press a Key", 0.4, 0xff0000);
+			cvui::update();
+			cv::imshow(WINDOW_NAME, window);
+
+			saved[7] = charFinder(keycodes, window);
+		}
+		cvui::printf(window, 500, 395, 0.4, 0xffffff, "Both Eyes");
+		if (cvui::button(window, 580, 390, 100, 30, keybinds[saved[8]])) {
+			cvui::text(window, 520, 425, "Press a Key", 0.4, 0xff0000);
+			cvui::update();
+			cv::imshow(WINDOW_NAME, window);
+
+			saved[8] = charFinder(keycodes, window);
+		}
+		cvui::printf(window, 500, 445, 0.4, 0xffffff, "Mouth Open");
+		if (cvui::button(window, 580, 440, 100, 30, keybinds[saved[9]])) {
+			cvui::text(window, 520, 475, "Press a Key", 0.4, 0xff0000);
+			cvui::update();
+			cv::imshow(WINDOW_NAME, window);
+
+			saved[9] = charFinder(keycodes, window);
+		}
+
+#endif
 
 		cvui::update();
 
