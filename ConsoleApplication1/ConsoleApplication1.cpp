@@ -1,4 +1,4 @@
-// Define program constants
+﻿// Define program constants
 #define WINVER 0x0500
 #define LOAD_PROFILE false
 #define CVUI_IMPLEMENTATION
@@ -63,7 +63,7 @@ void faceDetector(const cv::Mat& image, vector<cv::Rect>& faces, cv::CascadeClas
 
 // Returns distance between 2 2D points
 float dist(cv::Point2f a, cv::Point2f b) {
-	return sqrtf(pow(b.x - a.x, 2) + pow(b.y - a.y, 2));
+	return sqrt(pow(b.x - a.x, 2) + pow(b.y - a.y, 2));
 }
 
 // Returns a vector with distances between points on the face
@@ -103,7 +103,7 @@ vector<float> calculateVals(vector<cv::Point2f> current, cv::Rect face) {
 }
 
 // Estimates movements based on differences in distances between base and current images
-cv::String calculateMovements(vector<float> base, vector<float> current, INPUT kb, INPUT ms) {
+cv::String calculateMovements(vector<float> base, vector<float> current, INPUT kb, INPUT ms, int(&saved)[10], vector<int>(&keycodes), int threshold) {
 	// Calculate angles of head tilt
 	float angleCurrent = atan((current[1] - current[0]) / (1.0f + current[0] * current[1])) * 180.0f / 3.4159265f;
 	float angleBase = atan((base[1] - base[0]) / (1.0f + base[0] * base[1])) * 180.0f / 3.4159265f;
@@ -111,195 +111,260 @@ cv::String calculateMovements(vector<float> base, vector<float> current, INPUT k
 	// String to store movements
 	cv::String result = "";
 
-
 	if (current[5] / base[5] > 1.3f) {
-		kb.ki.wVk = VK_SPACE; // virtual-key code for the space button
-		kb.ki.dwFlags = 0; // 0 for key press
-
+		kb.ki.wVk = keycodes[saved[9]];
+		kb.ki.dwFlags = 0;
 		SendInput(1, &kb, sizeof(INPUT));
 
 		result += "MO ";
 	}
+	else {
+		if (GetKeyState(keycodes[saved[9]]) & 0x8000) {
+			kb.ki.wVk = keycodes[saved[9]];
+			kb.ki.dwFlags = KEYEVENTF_KEYUP;
+			SendInput(1, &kb, sizeof(INPUT));
+		}
+	}
 
 	if (angleCurrent / angleBase > 1.2f) {
-		if ((GetKeyState(VK_RBUTTON) < 0) != 0) {
-			ms.mi.dwFlags = MOUSEEVENTF_RIGHTDOWN;
-			SendInput(1, &ms, sizeof(INPUT));
-
-			Sleep(1);
-		}
+		kb.ki.wVk = keycodes[saved[5]];
+		kb.ki.dwFlags = 0;
+		SendInput(1, &kb, sizeof(INPUT));
 
 		result += "RR ";
 	}
 	else if (angleCurrent / angleBase < 0.8f) {
-		if ((GetKeyState(VK_LBUTTON) < 0) != 0) {
-			ms.mi.dwFlags = MOUSEEVENTF_LEFTDOWN;
-			SendInput(1, &ms, sizeof(INPUT));
-
-			Sleep(1);
-		}
+		kb.ki.wVk = keycodes[saved[4]];
+		kb.ki.dwFlags = 0;
+		SendInput(1, &kb, sizeof(INPUT));
 
 		result += "RL ";
 	}
 	else {
-		if ((GetKeyState(VK_RBUTTON) < 0) == 0) {
-			ms.mi.dwFlags = MOUSEEVENTF_RIGHTUP;
-			SendInput(1, &ms, sizeof(INPUT));
+		if (GetKeyState(keycodes[saved[4]]) & 0x8000) {
+			kb.ki.wVk = keycodes[saved[4]];
+			kb.ki.dwFlags = KEYEVENTF_KEYUP;
+			SendInput(1, &kb, sizeof(INPUT));
 		}
-
-		if ((GetKeyState(VK_LBUTTON) < 0) == 0) {
-			ms.mi.dwFlags = MOUSEEVENTF_LEFTUP;
-			SendInput(1, &ms, sizeof(INPUT));
+		if (GetKeyState(keycodes[saved[5]]) & 0x8000) {
+			kb.ki.wVk = keycodes[saved[5]];
+			kb.ki.dwFlags = KEYEVENTF_KEYUP;
+			SendInput(1, &kb, sizeof(INPUT));
 		}
 	}
 
-
 	if (current[4] / base[4] < 0.9f) {
+		kb.ki.wVk = keycodes[saved[3]];
+		kb.ki.dwFlags = 0;
+		SendInput(1, &kb, sizeof(INPUT));
 
 		result += "PD ";
 	}
 	else if (current[4] / base[4] > 1.1f) {
+		kb.ki.wVk = keycodes[saved[2]];
+		kb.ki.dwFlags = 0;
+		SendInput(1, &kb, sizeof(INPUT));
 
 		result += "PU ";
 	}
-
-
+	else {
+		if (GetKeyState(keycodes[saved[2]]) & 0x8000) {
+			kb.ki.wVk = keycodes[saved[2]];
+			kb.ki.dwFlags = KEYEVENTF_KEYUP;
+			SendInput(1, &kb, sizeof(INPUT));
+		}
+		if (GetKeyState(keycodes[saved[3]]) & 0x8000) {
+			kb.ki.wVk = keycodes[saved[3]];
+			kb.ki.dwFlags = KEYEVENTF_KEYUP;
+			SendInput(1, &kb, sizeof(INPUT));
+		}
+	}
 
 	if (current[6] / base[6] < 0.8f && current[7] / base[7] < 0.8f) {
-		kb.ki.wVk = 0x44; // virtual-key code for the A key
-		kb.ki.dwFlags = 0; // 0 for key press
-
-		//SendInput(1, &kb, sizeof(INPUT));
+		kb.ki.wVk = keycodes[saved[8]];
+		kb.ki.dwFlags = 0;
+		SendInput(1, &kb, sizeof(INPUT));
 
 		result += "EC ";
 	}
 	else if (current[6] / base[6] < 0.9f) {
-		kb.ki.wVk = 0x44; // virtual-key code for the A key
-		kb.ki.dwFlags = 0; // 0 for key press
-
-		//SendInput(1, &kb, sizeof(INPUT));
+		kb.ki.wVk = keycodes[saved[6]];
+		kb.ki.dwFlags = 0;
+		SendInput(1, &kb, sizeof(INPUT));
 
 		result += "LE ";
 	}
 	else if (current[7] / base[7] < 0.9f) {
-		kb.ki.wVk = 0x45; // virtual-key code for the E key
-		kb.ki.dwFlags = 0; // 0 for key press
-
+		kb.ki.wVk = keycodes[saved[7]];
+		kb.ki.dwFlags = 0;
 		SendInput(1, &kb, sizeof(INPUT));
 
 		result += "RE ";
 	}
-
+	else {
+		if (GetKeyState(keycodes[saved[6]]) & 0x8000) {
+			kb.ki.wVk = keycodes[saved[6]];
+			kb.ki.dwFlags = KEYEVENTF_KEYUP;
+			SendInput(1, &kb, sizeof(INPUT));
+		}
+		if (GetKeyState(keycodes[saved[7]]) & 0x8000) {
+			kb.ki.wVk = keycodes[saved[7]];
+			kb.ki.dwFlags = KEYEVENTF_KEYUP;
+			SendInput(1, &kb, sizeof(INPUT));
+		}
+		if (GetKeyState(keycodes[saved[8]]) & 0x8000) {
+			kb.ki.wVk = keycodes[saved[8]];
+			kb.ki.dwFlags = KEYEVENTF_KEYUP;
+			SendInput(1, &kb, sizeof(INPUT));
+		}
+	}
 
 	if (current[2] / base[2] < 0.9f && current[3] / base[3] > 1.05f) {
-		kb.ki.wVk = 0x44; // virtual-key code for the A key
-		kb.ki.dwFlags = 0; // 0 for key press
-
+		kb.ki.wVk = keycodes[saved[1]];
+		kb.ki.dwFlags = 0;
 		SendInput(1, &kb, sizeof(INPUT));
 
 		result += "YR ";
 	}
 	else if (current[3] / base[3] < 0.9f && current[2] / base[2] > 1.05f) {
-		kb.ki.wVk = 0x41; // virtual-key code for the D key
-		kb.ki.dwFlags = 0; // 0 for key press
-
+		kb.ki.wVk = keycodes[saved[0]];
+		kb.ki.dwFlags = 0;
 		SendInput(1, &kb, sizeof(INPUT));
 
 		result += "YL ";
 	}
+	else {
+		if (GetKeyState(keycodes[saved[0]]) & 0x8000) {
+			kb.ki.wVk = keycodes[saved[0]];
+			kb.ki.dwFlags = KEYEVENTF_KEYUP;
+			SendInput(1, &kb, sizeof(INPUT));
+		}
+		if (GetKeyState(keycodes[saved[1]]) & 0x8000) {
+			kb.ki.wVk = keycodes[saved[1]];
+			kb.ki.dwFlags = KEYEVENTF_KEYUP;
+			SendInput(1, &kb, sizeof(INPUT));
+		}
+	}
+
 
 	if (result == "") {
 		return "None";
 	}
 
 	return result;
-
 }
 
 // Same as previous function but for mouse movement
-cv::String calculateMovementsMouse(vector<float> base, vector<float> current, INPUT kb, INPUT ms) {
+cv::String calculateMovementsMouse(vector<float> base, vector<float> current, INPUT kb, INPUT ms, int(&saved)[6], vector<int>(&keycodes), int sensitivity, int threshold) {
 	POINT p;
 	float angleCurrent = atan((current[1] - current[0]) / (1.0f + current[0] * current[1])) * 180.0f / 3.4159265f;
 	float angleBase = atan((base[1] - base[0]) / (1.0f + base[0] * base[1])) * 180.0f / 3.4159265f;
 
 	cv::String result = "";
 
-
 	if (current[5] / base[5] > 1.3f) {
-		kb.ki.wVk = VK_SPACE; // virtual-key code for the space button
+		kb.ki.wVk = keycodes[saved[5]]; // virtual-key code for the space button
 		kb.ki.dwFlags = 0; // 0 for key press
-
 		SendInput(1, &kb, sizeof(INPUT));
 
 		result += "MO ";
 	}
+	else {
+		if (GetKeyState(keycodes[saved[5]]) & 0x8000) {
+			kb.ki.wVk = keycodes[saved[5]];
+			kb.ki.dwFlags = KEYEVENTF_KEYUP;
+			SendInput(1, &kb, sizeof(INPUT));
+		}
+	}
 
 	if (angleCurrent / angleBase > 1.2f) {
-		ms.mi.dwFlags = MOUSEEVENTF_RIGHTDOWN;
-		SendInput(1, &ms, sizeof(INPUT));
+		kb.ki.wVk = keycodes[saved[1]]; // virtual-key code for the D key
+		kb.ki.dwFlags = 0; // 0 for key press
+		SendInput(1, &kb, sizeof(INPUT));
 
 		result += "RR ";
 	}
 	else if (angleCurrent / angleBase < 0.8f) {
-		ms.mi.dwFlags = MOUSEEVENTF_LEFTDOWN;
-		SendInput(1, &ms, sizeof(INPUT));
+		kb.ki.wVk = keycodes[saved[0]]; // virtual-key code for the D key
+		kb.ki.dwFlags = 0; // 0 for key press
+		SendInput(1, &kb, sizeof(INPUT));
 
 		result += "RL ";
 	}
 	else {
-		ms.mi.dwFlags = MOUSEEVENTF_RIGHTUP;
-		SendInput(1, &ms, sizeof(INPUT));
-
-		ms.mi.dwFlags = MOUSEEVENTF_LEFTUP;
-		SendInput(1, &ms, sizeof(INPUT));
+		if (GetKeyState(keycodes[saved[0]]) & 0x8000) {
+			kb.ki.wVk = keycodes[saved[0]];
+			kb.ki.dwFlags = KEYEVENTF_KEYUP;
+			SendInput(1, &kb, sizeof(INPUT));
+		}
+		if (GetKeyState(keycodes[saved[1]]) & 0x8000) {
+			kb.ki.wVk = keycodes[saved[1]];
+			kb.ki.dwFlags = KEYEVENTF_KEYUP;
+			SendInput(1, &kb, sizeof(INPUT));
+		}
 	}
-
 
 	if (current[4] / base[4] < 0.9f) {
 		GetCursorPos(&p);
-
-		SetCursorPos(p.x, p.y + (25 * ((current[2] / base[2]) - 1)));
+		SetCursorPos(p.x, (p.y - ((current[1] / base[1]) - 1)) * sensitivity);
 
 		result += "PD ";
 	}
 	else if (current[4] / base[4] > 1.1f) {
 		GetCursorPos(&p);
-
-		SetCursorPos(p.x, p.y - (25 * ((current[1] / base[1]) - 1)));
+		SetCursorPos(p.x, (p.y + ((current[2] / base[2]) - 1)) * sensitivity);
 
 		result += "PU ";
 	}
 
-
-
 	if (current[6] / base[6] < 0.8f && current[7] / base[7] < 0.8f) {
-
+		kb.ki.wVk = keycodes[saved[4]]; // virtual-key code for the D key
+		kb.ki.dwFlags = 0; // 0 for key press
+		SendInput(1, &kb, sizeof(INPUT));
 
 		result += "EC ";
 	}
 	else if (current[6] / base[6] < 0.9f) {
-
+		kb.ki.wVk = keycodes[saved[2]]; // virtual-key code for the D key
+		kb.ki.dwFlags = 0; // 0 for key press
+		SendInput(1, &kb, sizeof(INPUT));
 
 		result += "LE ";
 	}
 	else if (current[7] / base[7] < 0.9f) {
-
+		kb.ki.wVk = keycodes[saved[3]]; // virtual-key code for the D key
+		kb.ki.dwFlags = 0; // 0 for key press
+		SendInput(1, &kb, sizeof(INPUT));
 
 		result += "RE ";
 	}
-
+	else {
+		if (GetKeyState(keycodes[saved[2]]) & 0x8000) {
+			kb.ki.wVk = keycodes[saved[2]];
+			kb.ki.dwFlags = KEYEVENTF_KEYUP;
+			SendInput(1, &kb, sizeof(INPUT));
+		}
+		if (GetKeyState(keycodes[saved[3]]) & 0x8000) {
+			kb.ki.wVk = keycodes[saved[3]];
+			kb.ki.dwFlags = KEYEVENTF_KEYUP;
+			SendInput(1, &kb, sizeof(INPUT));
+		}
+		if (GetKeyState(keycodes[saved[4]]) & 0x8000) {
+			kb.ki.wVk = keycodes[saved[4]];
+			kb.ki.dwFlags = KEYEVENTF_KEYUP;
+			SendInput(1, &kb, sizeof(INPUT));
+		}
+	}
 
 	if (current[2] / base[2] < 0.9f && current[3] / base[3] > 1.05f) {
 		GetCursorPos(&p);
-
-		SetCursorPos(p.x + (25 * ((current[2] / base[2]) - 1)), p.y);
+		SetCursorPos((p.x + ((current[2] / base[2]) - 1)) * sensitivity, p.y);
 
 		result += "YR ";
 	}
 	else if (current[3] / base[3] < 0.9f && current[2] / base[2] > 1.05f) {
 		GetCursorPos(&p);
-
-		SetCursorPos(p.x - (25 * ((current[1] / base[1]) - 1)), p.y);
+		SetCursorPos((p.x - ((current[1] / base[1]) - 1)) * sensitivity, p.y);
 
 		result += "YL ";
 	}
@@ -358,21 +423,21 @@ int main(int, char**) {
 	cv::Mat reduced;
 
 	vector<cv::Rect> faces;
-	if (0) {
-		// load cascade for face detection
-		const cv::String cascade_name = "C:/lib/opencv/data/haarcascades/haarcascade_frontalface_default.xml";
-		cv::CascadeClassifier face_cascade;
 
-		if (not face_cascade.load(cascade_name)) {
-			cerr << "Cannot load cascade classifier from file: " << cascade_name << endl;
-			return -1;
-		}
+	// load cascade for face detection
+	const cv::String cascade_name = "C:/lib/opencv/data/haarcascades/haarcascade_frontalface_default.xml";
+	cv::CascadeClassifier face_cascade;
 
-		const string facemark_filename = "C:/lib/opencv/data/landmark_models/lbfmodel.yaml";
-		cv::Ptr<cv::face::Facemark> facemark = createFacemarkLBF();
-		facemark->loadModel(facemark_filename);
-		cout << "Loaded facemark LBF model" << endl;
+	if (not face_cascade.load(cascade_name)) {
+		cerr << "Cannot load cascade classifier from file: " << cascade_name << endl;
+		return -1;
 	}
+
+	const string facemark_filename = "C:/lib/opencv/data/landmark_models/lbfmodel.yaml";
+	cv::Ptr<cv::face::Facemark> facemark = createFacemarkLBF();
+	facemark->loadModel(facemark_filename);
+	cout << "Loaded facemark LBF model" << endl;
+
 
 	vector<vector<cv::Point2f>> shapes;
 	vector<float> base = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
@@ -391,12 +456,14 @@ int main(int, char**) {
 	vector<string> keybinds = { "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U",
 	"V", "W", "X", "Y", "Z", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "TAB", "CAPS LCK", "SHIFT", "CTRL", "ALT", "ENTER", "ESC",
 	"UP", "DOWN", "LEFT", "RIGHT", "MOUSE 1", "MOUSE 2", "MOUSE 3", "SPACE" };
-	vector<int> keycodes = { 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x49, 0x49, 0x4A, 0x4B, 0x4C, 0x4D,0x4E, 0x4F, 0x50, 0x51, 0x52,
+	vector<int> keycodes = { 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x49, 0x49, 0x4A, 0x4B, 0x4C, 0x4D, 0x4E, 0x4F, 0x50, 0x51, 0x52,
 	0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5A, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x09, 0x14, 0x10, 0x11,
 	0x12, 0x0D, 0x1B, 0x26, 0x28, 0x25, 0x27, 0x01, 0x02, 0x03, 0x20 };
-	int saved[10] = { 0, 4, 22, 18, 16, 4, 47, 48, 49, 42 };
 
-	int mouseSens = 1.0f;
+	int saved[10] = { 0, 3, 22, 18, 4, 16, 38, 47, 48, 49 };
+	int savedMouse[6] = { 38, 39, 40, 47, 48, 49 };
+
+	int mouseSens = 10.0f;
 	int thresholdSens = 1.0f;
 
 #endif
@@ -423,7 +490,7 @@ int main(int, char**) {
 		cvtColor(reduced, gray, cv::COLOR_BGR2GRAY);
 
 		// ... obtain an image in img
-		/**faceDetector(gray, faces, face_cascade);
+		faceDetector(gray, faces, face_cascade);
 		// Check if faces detected or not
 		if (faces.size() > 0) {
 			// We assume a single face so we look at the first only
@@ -432,14 +499,14 @@ int main(int, char**) {
 			if (cropped) {
 				offsetX += faces[0].x - buffer;
 				offsetY += faces[0].y - buffer;
-				width = faces[0].width + (2 * buffer);
-				height = faces[0].height + (2 * buffer);
+				width = faces[0].width + (2.0f * buffer);
+				height = faces[0].height + (2.0f * buffer);
 			}
 			else {
 				offsetX = faces[0].x - buffer;
 				offsetY = faces[0].y - buffer;
-				width = faces[0].width + (2 * buffer);
-				height = faces[0].height + (2 * buffer);
+				width = faces[0].width + (2.0f * buffer);
+				height = faces[0].height + (2.0f * buffer);
 				cropped = true;
 			}
 
@@ -469,10 +536,10 @@ int main(int, char**) {
 
 			if (paused) {
 				if (mode == 1) {
-					message = calculateMovements(base, calculateVals(shapes[0], faces[0]), kb, ms);
+					message = calculateMovements(base, calculateVals(shapes[0], faces[0]), kb, ms, saved, keycodes, thresholdSens);
 				}
 				else if (mode == -1) {
-					message = calculateMovementsMouse(base, calculateVals(shapes[0], faces[0]), kb, ms);
+					message = calculateMovementsMouse(base, calculateVals(shapes[0], faces[0]), kb, ms, savedMouse, keycodes, mouseSens, thresholdSens);
 				}
 			}
 
@@ -485,7 +552,7 @@ int main(int, char**) {
 			offsetY = 0;
 			width = 0;
 			height = 0;
-		}**/
+		}
 
 		// Resize the material 
 		cv::resize(reduced, frame, cv::Size(210, 210), 1, 1, 1);
@@ -496,10 +563,10 @@ int main(int, char**) {
 		// Sliders
 #if 1
 		cvui::text(window, 350, 60, "Mouse Sensitivity", 0.4f, 0xffffff);
-		cvui::trackbar(window, 475, 60, 250, &mouseSens, 1, 10, 0.1f);
+		cvui::trackbar(window, 475, 60, 250, &mouseSens, 1, 100, 0.1f);
 
 		cvui::text(window, 350, 150, "Mouse Sensitivity", 0.4f, 0xffffff);
-		cvui::trackbar(window, 475, 150, 250, &thresholdSens, 1, 10, 0.1f);
+		cvui::trackbar(window, 475, 150, 250, &thresholdSens, 1, 100, 0.1f);
 
 #endif
 
@@ -528,86 +595,154 @@ int main(int, char**) {
 
 		// Keybindings
 #if 1
-		cvui::printf(window, 300, 245, 0.4, 0xffffff, "Look Left");
-		if (cvui::button(window, 380, 240, 100, 30, keybinds[saved[0]])) {
-			cvui::text(window, 340, 275, "Press a Key", 0.4, 0xff0000);
-			cvui::update();
-			cv::imshow(WINDOW_NAME, window);
+		if (mode == -1) {
+			cvui::printf(window, 300, 245, 0.4, 0xffffff, "Look Left");
+			if (cvui::button(window, 380, 240, 100, 30, keybinds[saved[0]])) {
+				cvui::text(window, 340, 275, "Press a Key", 0.4, 0xff0000);
+				cvui::update();
+				cv::imshow(WINDOW_NAME, window);
 
-			saved[0] = charFinder(keycodes, window);
-		}
-		cvui::printf(window, 300, 295, 0.4, 0xffffff, "Look Right");
-		if (cvui::button(window, 380, 290, 100, 30, keybinds[saved[1]])) {
-			cvui::text(window, 340, 325, "Press a Key", 0.4, 0xff0000);
-			cvui::update();
-			cv::imshow(WINDOW_NAME, window);
+				saved[0] = charFinder(keycodes, window);
+			}
+			cvui::printf(window, 300, 295, 0.4, 0xffffff, "Look Right");
+			if (cvui::button(window, 380, 290, 100, 30, keybinds[saved[1]])) {
+				cvui::text(window, 340, 325, "Press a Key", 0.4, 0xff0000);
+				cvui::update();
+				cv::imshow(WINDOW_NAME, window);
 
-			saved[1] = charFinder(keycodes, window);
-		}
-		cvui::printf(window, 300, 345, 0.4, 0xffffff, "Look Up");
-		if (cvui::button(window, 380, 340, 100, 30, keybinds[saved[2]])) {
-			cvui::text(window, 340, 375, "Press a Key", 0.4, 0xff0000);
-			cvui::update();
-			cv::imshow(WINDOW_NAME, window);
+				saved[1] = charFinder(keycodes, window);
+			}
+			cvui::printf(window, 300, 345, 0.4, 0xffffff, "Look Up");
+			if (cvui::button(window, 380, 340, 100, 30, keybinds[saved[2]])) {
+				cvui::text(window, 340, 375, "Press a Key", 0.4, 0xff0000);
+				cvui::update();
+				cv::imshow(WINDOW_NAME, window);
 
-			saved[2] = charFinder(keycodes, window);
-		}
-		cvui::printf(window, 300, 395, 0.4, 0xffffff, "Look Down");
-		if (cvui::button(window, 380, 390, 100, 30, keybinds[saved[3]])) {
-			cvui::text(window, 340, 425, "Press a Key", 0.4, 0xff0000);
-			cvui::update();
-			cv::imshow(WINDOW_NAME, window);
+				saved[2] = charFinder(keycodes, window);
+			}
+			cvui::printf(window, 300, 395, 0.4, 0xffffff, "Look Down");
+			if (cvui::button(window, 380, 390, 100, 30, keybinds[saved[3]])) {
+				cvui::text(window, 340, 425, "Press a Key", 0.4, 0xff0000);
+				cvui::update();
+				cv::imshow(WINDOW_NAME, window);
 
-			saved[3] = charFinder(keycodes, window);
-		}
-		cvui::printf(window, 300, 445, 0.4, 0xffffff, "Tilt Left");
-		if (cvui::button(window, 380, 440, 100, 30, keybinds[saved[4]])) {
-			cvui::text(window, 340, 475, "Press a Key", 0.4, 0xff0000);
-			cvui::update();
-			cv::imshow(WINDOW_NAME, window);
+				saved[3] = charFinder(keycodes, window);
+			}
+			cvui::printf(window, 300, 445, 0.4, 0xffffff, "Tilt Left");
+			if (cvui::button(window, 380, 440, 100, 30, keybinds[saved[4]])) {
+				cvui::text(window, 340, 475, "Press a Key", 0.4, 0xff0000);
+				cvui::update();
+				cv::imshow(WINDOW_NAME, window);
 
-			saved[4] = charFinder(keycodes, window);
-		}
-		cvui::printf(window, 500, 245, 0.4, 0xffffff, "Tilt Right");
-		if (cvui::button(window, 580, 240, 100, 30, keybinds[saved[5]])) {
-			cvui::text(window, 520, 275, "Press a Key", 0.4, 0xff0000);
-			cvui::update();
-			cv::imshow(WINDOW_NAME, window);
+				saved[4] = charFinder(keycodes, window);
+			}
+			cvui::printf(window, 500, 245, 0.4, 0xffffff, "Tilt Right");
+			if (cvui::button(window, 580, 240, 100, 30, keybinds[saved[5]])) {
+				cvui::text(window, 520, 275, "Press a Key", 0.4, 0xff0000);
+				cvui::update();
+				cv::imshow(WINDOW_NAME, window);
 
-			saved[5] = charFinder(keycodes, window);
-		}
-		cvui::printf(window, 500, 295, 0.4, 0xffffff, "Left Eye");
-		if (cvui::button(window, 580, 290, 100, 30, keybinds[saved[6]])) {
-			cvui::text(window, 520, 325, "Press a Key", 0.4, 0xff0000);
-			cvui::update();
-			cv::imshow(WINDOW_NAME, window);
+				saved[5] = charFinder(keycodes, window);
+			}
+			cvui::printf(window, 500, 295, 0.4, 0xffffff, "Left Eye");
+			if (cvui::button(window, 580, 290, 100, 30, keybinds[saved[6]])) {
+				cvui::text(window, 520, 325, "Press a Key", 0.4, 0xff0000);
+				cvui::update();
+				cv::imshow(WINDOW_NAME, window);
 
-			saved[6] = charFinder(keycodes, window);
-		}
-		cvui::printf(window, 500, 345, 0.4, 0xffffff, "Right Eye");
-		if (cvui::button(window, 580, 340, 100, 30, keybinds[saved[7]])) {
-			cvui::text(window, 520, 375, "Press a Key", 0.4, 0xff0000);
-			cvui::update();
-			cv::imshow(WINDOW_NAME, window);
+				saved[6] = charFinder(keycodes, window);
+			}
+			cvui::printf(window, 500, 345, 0.4, 0xffffff, "Right Eye");
+			if (cvui::button(window, 580, 340, 100, 30, keybinds[saved[7]])) {
+				cvui::text(window, 520, 375, "Press a Key", 0.4, 0xff0000);
+				cvui::update();
+				cv::imshow(WINDOW_NAME, window);
 
-			saved[7] = charFinder(keycodes, window);
-		}
-		cvui::printf(window, 500, 395, 0.4, 0xffffff, "Both Eyes");
-		if (cvui::button(window, 580, 390, 100, 30, keybinds[saved[8]])) {
-			cvui::text(window, 520, 425, "Press a Key", 0.4, 0xff0000);
-			cvui::update();
-			cv::imshow(WINDOW_NAME, window);
+				saved[7] = charFinder(keycodes, window);
+			}
+			cvui::printf(window, 500, 395, 0.4, 0xffffff, "Both Eyes");
+			if (cvui::button(window, 580, 390, 100, 30, keybinds[saved[8]])) {
+				cvui::text(window, 520, 425, "Press a Key", 0.4, 0xff0000);
+				cvui::update();
+				cv::imshow(WINDOW_NAME, window);
 
-			saved[8] = charFinder(keycodes, window);
-		}
-		cvui::printf(window, 500, 445, 0.4, 0xffffff, "Mouth Open");
-		if (cvui::button(window, 580, 440, 100, 30, keybinds[saved[9]])) {
-			cvui::text(window, 520, 475, "Press a Key", 0.4, 0xff0000);
-			cvui::update();
-			cv::imshow(WINDOW_NAME, window);
+				saved[8] = charFinder(keycodes, window);
+			}
+			cvui::printf(window, 500, 445, 0.4, 0xffffff, "Mouth Open");
+			if (cvui::button(window, 580, 440, 100, 30, keybinds[saved[9]])) {
+				cvui::text(window, 520, 475, "Press a Key", 0.4, 0xff0000);
+				cvui::update();
+				cv::imshow(WINDOW_NAME, window);
 
-			saved[9] = charFinder(keycodes, window);
+				saved[9] = charFinder(keycodes, window);
+			}
 		}
+		else {
+			cvui::printf(window, 300, 245, 0.4, 0xffffff, "Look Left");
+			cvui::button(window, 380, 240, 100, 30, "Move Left");
+
+			cvui::printf(window, 300, 295, 0.4, 0xffffff, "Look Right");
+			cvui::button(window, 380, 290, 100, 30, "Move Right");
+
+			cvui::printf(window, 300, 345, 0.4, 0xffffff, "Look Up");
+			cvui::button(window, 380, 340, 100, 30, "Move Up");
+
+			cvui::printf(window, 300, 395, 0.4, 0xffffff, "Look Down");
+			cvui::button(window, 380, 390, 100, 30, "Move Down");
+
+			cvui::printf(window, 300, 445, 0.4, 0xffffff, "Tilt Left");
+
+			if (cvui::button(window, 380, 440, 100, 30, keybinds[savedMouse[0]])) {
+				cvui::text(window, 340, 475, "Press a Key", 0.4, 0xff0000);
+				cvui::update();
+				cv::imshow(WINDOW_NAME, window);
+
+				savedMouse[0] = charFinder(keycodes, window);
+			}
+			cvui::printf(window, 500, 245, 0.4, 0xffffff, "Tilt Right");
+			if (cvui::button(window, 580, 240, 100, 30, keybinds[savedMouse[1]])) {
+				cvui::text(window, 520, 275, "Press a Key", 0.4, 0xff0000);
+				cvui::update();
+				cv::imshow(WINDOW_NAME, window);
+
+				savedMouse[1] = charFinder(keycodes, window);
+			}
+			cvui::printf(window, 500, 295, 0.4, 0xffffff, "Left Eye");
+			if (cvui::button(window, 580, 290, 100, 30, keybinds[savedMouse[2]])) {
+				cvui::text(window, 520, 325, "Press a Key", 0.4, 0xff0000);
+				cvui::update();
+				cv::imshow(WINDOW_NAME, window);
+
+				savedMouse[2] = charFinder(keycodes, window);
+			}
+			cvui::printf(window, 500, 345, 0.4, 0xffffff, "Right Eye");
+			if (cvui::button(window, 580, 340, 100, 30, keybinds[savedMouse[3]])) {
+				cvui::text(window, 520, 375, "Press a Key", 0.4, 0xff0000);
+				cvui::update();
+				cv::imshow(WINDOW_NAME, window);
+
+				savedMouse[3] = charFinder(keycodes, window);
+			}
+			cvui::printf(window, 500, 395, 0.4, 0xffffff, "Both Eyes");
+			if (cvui::button(window, 580, 390, 100, 30, keybinds[savedMouse[4]])) {
+				cvui::text(window, 520, 425, "Press a Key", 0.4, 0xff0000);
+				cvui::update();
+				cv::imshow(WINDOW_NAME, window);
+
+				savedMouse[4] = charFinder(keycodes, window);
+			}
+			cvui::printf(window, 500, 445, 0.4, 0xffffff, "Mouth Open");
+			if (cvui::button(window, 580, 440, 100, 30, keybinds[savedMouse[5]])) {
+				cvui::text(window, 520, 475, "Press a Key", 0.4, 0xff0000);
+				cvui::update();
+				cv::imshow(WINDOW_NAME, window);
+
+				savedMouse[5] = charFinder(keycodes, window);
+			}
+
+		}
+
+
 
 #endif
 
