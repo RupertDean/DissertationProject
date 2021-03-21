@@ -1,7 +1,9 @@
-﻿// Define program constants
+﻿#pragma warning( disable : 4244 )
+
+// Define program constants
 #define WINVER 0x0500
-#define LOAD_PROFILE false
 #define CVUI_IMPLEMENTATION
+#define MY_ESTIMATION_METHOD 0
 #define WINDOW_NAME "CVUI Hello World!"
 
 // Include modules and header files
@@ -62,10 +64,26 @@ void faceDetector(const cv::Mat& image, vector<cv::Rect>& faces, cv::CascadeClas
 }
 
 // Returns distance between 2 2D points
-float dist(cv::Point2f a, cv::Point2f b) {
-	return sqrt(pow(b.x - a.x, 2) + pow(b.y - a.y, 2));
+float dist2(cv::Point2f a, cv::Point2f b) {
+	return sqrtf(pow(b.x - a.x, 2) + pow(b.y - a.y, 2));
 }
 
+// Distance between 2 3D points
+float dist3(cv::Point3f a, cv::Point3f b) {
+	return sqrtf(pow(b.x - a.x, 2) + pow(b.y - a.y, 2) + pow(b.z - a.z, 2));
+}
+
+// Midpoint of 2 2D points, ratio can be passed in to get a point weighted further to one side
+cv::Point2f mid2(cv::Point2f a, cv::Point2f b, float ratio = 0.5f) {
+	return cv::Point2f{ a.x + (ratio * (b.x - a.x)), a.y + (ratio * (b.y - a.y)) };
+}
+
+// Midpoint of 2 3D points
+cv::Point3f mid3(cv::Point3f a, cv::Point3f b) {
+	return cv::Point3f { a.x + (0.5f * (b.x - a.x)), a.y + (0.5f * (b.y - a.y)), a.z + (0.5f * (b.z - a.z)) };
+}
+
+#if MY_ESTIMATION_METHOD
 // Returns a vector with distances between points on the face
 // 0 and 1 for face angle, 2 left cheek, 3 right cheek, 4 eye to brow 5 mouth to chin
 // 6 mouth size, 7 left eye size, 8 right eye size
@@ -73,20 +91,20 @@ vector<float> calculateVals(vector<cv::Point2f> current, cv::Rect face) {
 	vector<float> vals = {
 	0, 0,
 
-	dist(current[0], current[28]) + dist(current[2], current[33]) + dist(current[4], current[48]),
+	dist2(current[0], current[28]) + dist2(current[2], current[33]) + dist2(current[4], current[48]),
 
-	dist(current[16], current[28]) + dist(current[14], current[33]) + dist(current[13], current[54]),
+	dist2(current[16], current[28]) + dist2(current[14], current[33]) + dist2(current[13], current[54]),
 
-	dist(current[17], current[36]) + dist(current[19], current[37]) + dist(current[21], current[39]) +
-		dist(current[22], current[42]) + dist(current[24], current[44]) + dist(current[26], current[45]),
+	dist2(current[17], current[36]) + dist2(current[19], current[37]) + dist2(current[21], current[39]) +
+		dist2(current[22], current[42]) + dist2(current[24], current[44]) + dist2(current[26], current[45]),
 		
-	dist(current[5], current[48]) + dist(current[8], current[57]) + dist(current[11], current[54]),
+	dist2(current[5], current[48]) + dist2(current[8], current[57]) + dist2(current[11], current[54]),
 
-	(dist(current[50], current[58]) + dist(current[51], current[57]) + dist(current[52], current[56])),
+	(dist2(current[50], current[58]) + dist2(current[51], current[57]) + dist2(current[52], current[56])),
 
-	(dist(current[37], current[41]) + dist(current[38], current[40])),
+	(dist2(current[37], current[41]) + dist2(current[38], current[40])),
 
-	(dist(current[43], current[47]) + dist(current[44], current[46]))
+	(dist2(current[43], current[47]) + dist2(current[44], current[46]))
 
 	};
 
@@ -377,10 +395,68 @@ cv::String calculateMovementsMouse(vector<float> base, vector<float> current, IN
 	return result;
 }
 
+#else
+
+// Calculates distances and varables used for alternative method of head pose etimation proposed in 
+//https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.28.5324&rep=rep1&type=pdf
+vector<float> calculateVals(vector<cv::Point2f> current, cv::Rect face, float mRatio, float nRatio) {
+	// 0 is Yaw
+	vector<float> angles = { 0, 0, 0 };
+
+	// Points normalised to nose tip
+	cv::Point2f noseTip = { 0.0f, 0.0f };
+	cv::Point2f leftEye = { current[36].x - current[33].x, current[36].y - current[33].y };
+	cv::Point2f rightEye = { current[45].x - current[33].x, current[45].y - current[33].y };
+	cv::Point2f leftMouth = { current[48].x - current[33].x, current[48].y - current[33].y };
+	cv::Point2f rightMouth = { current[54].x - current[33].x, current[54].y - current[33].y };
+
+	// Midpoints between eyes and mouth
+	cv::Point2f eyeMid = mid2(leftEye, rightEye);
+	cv::Point2f mouthMid = mid2(leftMouth, rightMouth);
+
+	// Point where nose base meets symmetry line
+	cv::Point2f noseBase = mid2(eyeMid, mouthMid, mRatio);
+
+	// Yaw is equal to the angle between line from nose base compared with x axis
+	// Pitch is calculated from observed angle of nose line compared to symmetry line and adjusted to fit ratios
+	// Roll is calculated as angle between facial points and x axis
+	float gradient1 = (noseTip.y - noseBase.y) / (noseTip.x - noseBase.x);
+	float gradient2 = (eyeMid.y - noseBase.y) / (eyeMid.x - noseBase.x);
+	float gradient3 = (current[0].y - current[16].y) / (current[0].x - current[16].x);
+
+	float m1 = pow( dist2(noseTip, noseBase) / dist2(eyeMid, mouthMid), 2);
+	float m2 = pow(cos(atan((gradient2 - gradient1) / (1 + (gradient1 * gradient2)))), 2);
+	
+	float a = pow(nRatio, 2) * (1 - m2);
+	float b = pow(nRatio, 2) * (m1 - 1 + (2 * m2));
+	float c = - m2 * pow(nRatio, 2);
+
+	float dz2P = (-b + sqrtf((b * b) - 4 * a * c)) / (2 * a);
+
+	// Save and convert to degrees for ease of reading
+	angles[0] = atan(gradient1) * (180.0f / 3.4159265f);
+	angles[1] = acos(sqrtf(dz2P)) * (180.0f / 3.4159265f);
+	angles[2] =  atan(gradient3) * (180.0f / 3.4159265f);
+
+	return angles;
+}
+
+cv::String calculateMovements(vector<float> base, vector<float> current, INPUT kb, INPUT ms, int(&saved)[10], vector<int>(&keycodes), int threshold) {
+	cv::String empty{};
+	return empty;
+}
+
+cv::String calculateMovementsMouse(vector<float> base, vector<float> current, INPUT kb, INPUT ms, int(&saved)[6], vector<int>(&keycodes), int sensitivity, int threshold) {
+	cv::String empty{};
+	return empty;
+}
+
+#endif
+
 // Saves landmarks in current frame
 vector<float> saveBaseLandmarks(vector<cv::Point2f> shapes, cv::Rect face) {
 	vector<cv::Point2f> base = shapes;
-	vector<float> vals = calculateVals(base, face);
+	vector<float> vals = calculateVals(base, face, 0.4f, 0.6f);
 	return vals;
 }
 
@@ -408,7 +484,6 @@ int main(int, char**) {
 	// Hardware input device
 	INPUT hd = {};
 	hd.type = INPUT_HARDWARE;
-
 
 	// open the first webcam plugged in the computer
 	cv::VideoCapture camera(0);
@@ -439,7 +514,6 @@ int main(int, char**) {
 	facemark->loadModel(facemark_filename);
 	cout << "Loaded facemark LBF model" << endl;
 
-
 	vector<vector<cv::Point2f>> shapes;
 	vector<float> base = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
@@ -466,6 +540,30 @@ int main(int, char**) {
 
 	int mouseSens = 15.0f;
 	int thresholdSens = 1.0f;
+
+	// 3D model points.
+	cv::Point3f noseTip = { 0.0f, 0.0f, 0.0f };
+	cv::Point3f chin = { 0.0f, -330.0f, -65.0f };
+	cv::Point3f leftEye = { -225.0f, 170.0f, -135.0f };
+	cv::Point3f rightEye = { 225.0f, 170.0f, -135.0f };
+	cv::Point3f leftMouth = { -150.0f, -150.0f, -125.0f };
+	cv::Point3f rightMouth = { 150.0f, -150.0f, -125.0f };
+
+	cv::Point3f eyeMid = mid3(leftEye, rightEye);
+	cv::Point3f mouthMid = mid3(leftMouth, rightMouth);
+
+	// y = (-1/m)x since line passes through origin at tip of nose
+	// y = mx - m*mouthMid.x + mouthmid.y
+	float m = (mouthMid.y - eyeMid.y) / (mouthMid.z - eyeMid.z);
+
+	// Intersection of lines
+	float x = ((-m * eyeMid.z) + eyeMid.y) / ((-1.0f / m) - m);
+	float y = (-1 / m) * x;
+
+	cv::Point3f noseBase = { 0, y, x };
+
+	float mRatio = dist3(mouthMid, noseBase) / dist3(eyeMid, mouthMid);
+	float nRatio = dist3(noseTip, noseBase) / dist3(eyeMid, mouthMid);
 
 #endif
 
@@ -537,10 +635,10 @@ int main(int, char**) {
 
 			if (!paused) {
 				if (mode == 1) {
-					message = calculateMovements(base, calculateVals(shapes[0], faces[0]), kb, ms, saved, keycodes, thresholdSens);
+					message = calculateMovements(base, calculateVals(shapes[0], faces[0], mRatio, nRatio), kb, ms, saved, keycodes, thresholdSens);
 				}
 				else if (mode == -1) {
-					message = calculateMovementsMouse(base, calculateVals(shapes[0], faces[0]), kb, ms, savedMouse, keycodes, (float) mouseSens/10, thresholdSens);
+					message = calculateMovementsMouse(base, calculateVals(shapes[0], faces[0], mRatio, nRatio), kb, ms, savedMouse, keycodes, (float) mouseSens/10, thresholdSens);
 				}
 			}
 
