@@ -397,7 +397,6 @@ cv::String calculateMovementsMouse(vector<float> base, vector<float> current, IN
 }
 
 #else
-
 // Calculates distances and varables used for alternative method of head pose etimation proposed in 
 //https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.28.5324&rep=rep1&type=pdf
 vector<float> calculateVals(vector<cv::Point2f> current, cv::Rect face, float mRatio, float nRatio) {
@@ -722,7 +721,6 @@ cv::String calculateMovementsMouse(vector<float> base, vector<float> current, IN
 
 	return movements;
 }
-
 #endif
 
 // Saves landmarks in current frame
