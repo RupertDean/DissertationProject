@@ -397,9 +397,21 @@ cv::String calculateMovementsMouse(vector<float> base, vector<float> current, IN
 }
 
 #elif ESTIMATION_METHOD == 1
+
+vector<float> compareAngles(vector<float> angles, vector<float> saved) {
+	if (angles[0] < saved[0]) saved[0] = angles[0];
+	if (angles[0] > saved[1]) saved[1] = angles[0];
+	if (angles[1] < saved[2]) saved[2] = angles[1];
+	if (angles[1] > saved[3]) saved[3] = angles[1];
+	if (angles[2] < saved[4]) saved[4] = angles[2];
+	if (angles[2] > saved[5]) saved[5] = angles[2];
+
+	return saved;
+}
+
 // Calculates distances and varables used for alternative method of head pose etimation proposed in 
 //https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.28.5324&rep=rep1&type=pdf
-vector<float> calculateVals(vector<cv::Point2f> current, cv::Rect face, float mRatio, float nRatio) {
+vector<float> calculateVals(vector<cv::Point2f> current, cv::Rect face, float mRatio, float nRatio, vector<float>& saved) {
 	// 0 is Yaw, 1 is Pitch, 2 is Roll, 3, 4, 5 are mouth, left eye and right eye
 	vector<float> angles = { 0, 0, 0, 0, 0, 0 };
 
@@ -444,7 +456,7 @@ vector<float> calculateVals(vector<cv::Point2f> current, cv::Rect face, float mR
 	angles[4] = (dist2(current[37], current[41]) + dist2(current[38], current[40]));
 	angles[5] = (dist2(current[43], current[47]) + dist2(current[44], current[46]));
 	
-	//cout << angles[0] << "		" << angles[1] << "		" << angles[2] << endl;
+	saved = compareAngles(angles, saved);
 
 	return angles;
 }
@@ -1056,8 +1068,8 @@ cv::String calculateMovementsMouse(vector<float> base, vector<float> current, IN
 // Saves landmarks in current frame
 vector<float> saveBaseLandmarks(vector<cv::Point2f> shapes, cv::Rect face) {
 	vector<cv::Point2f> base = shapes;
-
-	vector<float> vals = calculateVals(base, face, 0.4f, 0.6f);
+	vector<float> angles(6);
+	vector<float> vals = calculateVals(base, face, 0.4f, 0.6f, angles);
 	//vector<float> vals = calculateVals(base, face);
 	return vals;
 }
@@ -1204,24 +1216,15 @@ int main(int, char**) {
 
 	vector<cv::Point2f> min = reset();
 	vector<cv::Point2f> max = reset();
+	vector<float> angles(6);
 
 #endif
 
-	//auto start = chrono::system_clock::now();
-	//int counter = 0;
+	int counter = 0;
 
 	// Main Process Loop
 	while (true) {
-		//counter++;
-		//if (counter % 200 == 0) {
-		//	auto end = chrono::system_clock::now();
-		//	chrono::duration<double> elapsed_seconds = end - start;
-		//	time_t end_time = chrono::system_clock::to_time_t(end);
-		//	printf("\nElapsed time: %f seconds", elapsed_seconds.count());
-		//	printf("\n%f", 200 / elapsed_seconds.count());
-		//	start = chrono::system_clock::now();
-		//	}
-
+		counter++;
 		// Fill the frame with a nice color
 		window = cv::Scalar(49, 52, 49);
 
@@ -1285,28 +1288,17 @@ int main(int, char**) {
 
 			if (cv::waitKey(1) == 32) base = saveBaseLandmarks(shapes[0], faces[0]);
 
-			/**
-			if (min[0].x == 0) {
-				min = shapes[0];
-				max = shapes[0];
+			if (counter % 150 == 0) {
+				cout << angles[0] << "  " << angles[1] << "  " << angles[2] << "  " << angles[3] << "  " << angles[4] << "  " << angles[5] << endl;
 			}
-
-			if (counter % 5 == 0) calculateVariance(min, max, shapes[0]);
-
-			if (counter % 200 == 0) {
-				printVariance(min, max);
-				max = reset();
-				min = reset();
-			}
-			**/
 
 			if (!paused) {
 				if (mode == 1) {
-					message = calculateMovements(base, calculateVals(shapes[0], faces[0], mRatio, nRatio), kb, ms, saved, keycodes, 5.0f-thresholdSens);
+					message = calculateMovements(base, calculateVals(shapes[0], faces[0], mRatio, nRatio, angles), kb, ms, saved, keycodes, 5.0f-thresholdSens);
 					//message = calculateMovements(base, calculateVals(shapes[0], faces[0]), kb, ms, saved, keycodes, 5.0f - thresholdSens);
 				}
 				else if (mode == -1) {
-					message = calculateMovementsMouse(base, calculateVals(shapes[0], faces[0], mRatio, nRatio), kb, ms, savedMouse, keycodes, (float) mouseSens/10, (float)thresholdSens);
+					message = calculateMovementsMouse(base, calculateVals(shapes[0], faces[0], mRatio, nRatio, angles), kb, ms, savedMouse, keycodes, (float) mouseSens/10, (float)thresholdSens);
 					//message = calculateMovementsMouse(base, calculateVals(shapes[0], faces[0]), kb, ms, savedMouse, keycodes, (float)mouseSens / 10, (float)thresholdSens);
 				}
 			}
