@@ -4,7 +4,7 @@
 // Define program constants
 #define WINVER 0x0500
 #define CVUI_IMPLEMENTATION
-#define MY_ESTIMATION_METHOD 0
+#define ESTIMATION_METHOD 1
 #define WINDOW_NAME "Facial Game Control"
 
 // Include modules and header files
@@ -58,8 +58,8 @@ void faceDetector(const cv::Mat& image, vector<cv::Rect>& faces, cv::CascadeClas
 	face_cascade.detectMultiScale(
 		image,
 		faces,
-		1.75, // pyramid scale factor
-		5,   // lower threshold for neighbors count
+		1.5, // pyramid scale factor
+		3,   // lower threshold for neighbors count
 			 // here we hint the classifier to only look for one face
 		cv::CASCADE_SCALE_IMAGE + cv::CASCADE_FIND_BIGGEST_OBJECT);
 }
@@ -84,7 +84,7 @@ cv::Point3f mid3(cv::Point3f a, cv::Point3f b) {
 	return cv::Point3f { a.x + (0.5f * (b.x - a.x)), a.y + (0.5f * (b.y - a.y)), a.z + (0.5f * (b.z - a.z)) };
 }
 
-#if MY_ESTIMATION_METHOD
+#if ESTIMATION_METHOD == 0
 // Returns a vector with distances between points on the face
 // 0 and 1 for face angle, 2 left cheek, 3 right cheek, 4 eye to brow 5 mouth to chin
 // 6 mouth size, 7 left eye size, 8 right eye size
@@ -396,7 +396,7 @@ cv::String calculateMovementsMouse(vector<float> base, vector<float> current, IN
 	return result;
 }
 
-#else
+#elif ESTIMATION_METHOD == 1
 // Calculates distances and varables used for alternative method of head pose etimation proposed in 
 //https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.28.5324&rep=rep1&type=pdf
 vector<float> calculateVals(vector<cv::Point2f> current, cv::Rect face, float mRatio, float nRatio) {
@@ -447,43 +447,6 @@ vector<float> calculateVals(vector<cv::Point2f> current, cv::Rect face, float mR
 	//cout << angles[0] << "		" << angles[1] << "		" << angles[2] << endl;
 
 	return angles;
-}
-
-vector<float> calculateValsOCV(vector<cv::Point2f> current, cv::Rect face) {
-	// 2D image points. If you change the image, you need to change vector
-	std::vector<cv::Point2d> image_points;
-	image_points.push_back(current[33]);	// Nose tip
-	image_points.push_back(current[8]);		// Chin
-	image_points.push_back(current[36]);	// Left eye left corner
-	image_points.push_back(current[45]);	// Right eye right corner
-	image_points.push_back(current[48]);	// Left Mouth corner
-	image_points.push_back(current[54]);	// Right mouth corner
-
-	// 3D model points.
-	std::vector<cv::Point3d> model_points;
-	model_points.push_back(cv::Point3d(0.0f, 0.0f, 0.0f));               // Nose tip
-	model_points.push_back(cv::Point3d(0.0f, -330.0f, -65.0f));          // Chin
-	model_points.push_back(cv::Point3d(-225.0f, 170.0f, -135.0f));       // Left eye left corner
-	model_points.push_back(cv::Point3d(225.0f, 170.0f, -135.0f));        // Right eye right corner
-	model_points.push_back(cv::Point3d(-150.0f, -150.0f, -125.0f));      // Left Mouth corner
-	model_points.push_back(cv::Point3d(150.0f, -150.0f, -125.0f));       // Right mouth corner
-
-	// Camera internals
-	double focal_length = face.width; // Approximate focal length.
-	cv::Point2d center = cv::Point2d(face.width / 2, face.height / 2);
-	cv::Mat camera_matrix = (cv::Mat_<double>(3, 3) << focal_length, 0, center.x, 0, focal_length, center.y, 0, 0, 1);
-	cv::Mat dist_coeffs = cv::Mat::zeros(4, 1, cv::DataType<double>::type); // Assuming no lens distortion
-
-	// Output rotation and translation
-	cv::Mat rotation_vector; // Rotation in axis-angle form
-	cv::Mat translation_vector;
-
-	// Solve for pose
-	cv::solvePnP(model_points, image_points, camera_matrix, dist_coeffs, rotation_vector, translation_vector);
-
-	cout << "Rotation Vector " << endl << rotation_vector << endl;
-	cout << "Translation Vector" << endl << translation_vector << endl;
-
 }
 
 cv::String calculateMovements(vector<float> base, vector<float> current, INPUT kb, INPUT ms, int(&saved)[10], vector<int>(&keycodes), int threshold) {
@@ -656,13 +619,13 @@ cv::String calculateMovementsMouse(vector<float> base, vector<float> current, IN
 
 	if ((current[1] - base[1]) > 0.5f - (threshold / 10)) {
 		GetCursorPos(&p);
-		SetCursorPos(p.x, p.y + (abs(current[0]) * sensitivity/2));
+		SetCursorPos(p.x, p.y + (abs(current[0]) * sensitivity));
 
 		movements += "PD ";
 	}
 	else if ((current[1] - base[1]) < -3.0f + (threshold / 10)) {
 		GetCursorPos(&p);
-		SetCursorPos(p.x, p.y - (abs(current[0]) * sensitivity/2));
+		SetCursorPos(p.x, p.y - (abs(current[0]) * sensitivity));
 
 		movements += "PU ";
 	}
@@ -758,12 +721,344 @@ cv::String calculateMovementsMouse(vector<float> base, vector<float> current, IN
 
 	return movements;
 }
+
+#elif ESTIMATION_METHOD == 2
+// Method adapted from https://learnopencv.com/head-pose-estimation-using-opencv-and-dlib/
+// This is used for testing purposes only and I do not claim to be the original developer of this code
+vector<float> calculateVals(vector<cv::Point2f> current, cv::Rect face) {
+	// 2D image points. If you change the image, you need to change vector
+	std::vector<cv::Point2d> image_points;
+	image_points.push_back(current[33]);	// Nose tip
+	image_points.push_back(current[8]);		// Chin
+	image_points.push_back(current[36]);	// Left eye left corner
+	image_points.push_back(current[45]);	// Right eye right corner
+	image_points.push_back(current[48]);	// Left Mouth corner
+	image_points.push_back(current[54]);	// Right mouth corner
+
+	// 3D model points.
+	std::vector<cv::Point3d> model_points;
+	model_points.push_back(cv::Point3d(0.0f, 0.0f, 0.0f));               // Nose tip
+	model_points.push_back(cv::Point3d(0.0f, -330.0f, -65.0f));          // Chin
+	model_points.push_back(cv::Point3d(-225.0f, 170.0f, -135.0f));       // Left eye left corner
+	model_points.push_back(cv::Point3d(225.0f, 170.0f, -135.0f));        // Right eye right corner
+	model_points.push_back(cv::Point3d(-150.0f, -150.0f, -125.0f));      // Left Mouth corner
+	model_points.push_back(cv::Point3d(150.0f, -150.0f, -125.0f));       // Right mouth corner
+
+	// Camera internals
+	double focal_length = face.width; // Approximate focal length.
+	cv::Point2d center = cv::Point2d(face.width / 2, face.height / 2);
+	cv::Mat camera_matrix = (cv::Mat_<double>(3, 3) << focal_length, 0, center.x, 0, focal_length, center.y, 0, 0, 1);
+	cv::Mat dist_coeffs = cv::Mat::zeros(4, 1, cv::DataType<double>::type); // Assuming no lens distortion
+
+	// Output rotation and translation
+	cv::Mat rotation_vector; // Rotation in axis-angle form
+	cv::Mat translation_vector;
+
+	// Solve for pose
+	cv::solvePnP(model_points, image_points, camera_matrix, dist_coeffs, rotation_vector, translation_vector);
+
+	cv::Mat flat = rotation_vector.reshape(1, rotation_vector.total() * rotation_vector.channels());
+	vector<float> temp = rotation_vector.isContinuous() ? flat : flat.clone();
+
+	vector<float> vals(6);
+
+	vals[0] = temp[0] * 57.2958f;
+	vals[1] = temp[1] * 57.2958f;
+	vals[2] = temp[2] * 57.2958f;
+
+	vals[3] = (dist2(current[50], current[58]) + dist2(current[51], current[57]) + dist2(current[52], current[56]));
+	vals[4] = (dist2(current[37], current[41]) + dist2(current[38], current[40]));
+	vals[5] = (dist2(current[43], current[47]) + dist2(current[44], current[46]));
+
+	cout << vals[0] << "\n" << vals[1] << "\n" << vals[2] << "\n\n" << endl;
+
+	return vals;
+
+}
+
+cv::String calculateMovements(vector<float> base, vector<float> current, INPUT kb, INPUT ms, int(&saved)[10], vector<int>(&keycodes), int threshold) {
+	cv::String movements = "";
+
+	if (0.0f < current[0] && current[0] < 70.0f + threshold) {
+		kb.ki.wVk = keycodes[saved[0]];
+		kb.ki.dwFlags = 0;
+		SendInput(1, &kb, sizeof(INPUT));
+
+		movements += "YL ";
+	}
+	else if (0.0f > current[0] && current[0] > -70.0f - threshold) {
+		kb.ki.wVk = keycodes[saved[1]];
+		kb.ki.dwFlags = 0;
+		SendInput(1, &kb, sizeof(INPUT));
+
+		movements += "YR ";
+	}
+	else {
+		// Bitwise AND comparison to see if key is pressed
+		if (GetKeyState(keycodes[saved[0]]) & 0x8000) {
+			// If key is pressed then release the key
+			kb.ki.wVk = keycodes[saved[0]];
+			kb.ki.dwFlags = KEYEVENTF_KEYUP;
+			SendInput(1, &kb, sizeof(INPUT));
+		}
+		if (GetKeyState(keycodes[saved[1]]) & 0x8000) {
+			kb.ki.wVk = keycodes[saved[1]];
+			kb.ki.dwFlags = KEYEVENTF_KEYUP;
+			SendInput(1, &kb, sizeof(INPUT));
+		}
+	}
+
+	if ((current[1] - base[1]) > 3.0f - (threshold / 10)) {
+		kb.ki.wVk = keycodes[saved[2]];
+		kb.ki.dwFlags = 0;
+		SendInput(1, &kb, sizeof(INPUT));
+
+		movements += "PD ";
+	}
+	else if ((current[1] - base[1]) < -5.0f + (threshold / 10)) {
+		kb.ki.wVk = keycodes[saved[3]];
+		kb.ki.dwFlags = 0;
+		SendInput(1, &kb, sizeof(INPUT));
+
+		movements += "PU ";
+	}
+	else {
+		if (GetKeyState(keycodes[saved[2]]) & 0x8000) {
+			kb.ki.wVk = keycodes[saved[2]];
+			kb.ki.dwFlags = KEYEVENTF_KEYUP;
+			SendInput(1, &kb, sizeof(INPUT));
+		}
+		if (GetKeyState(keycodes[saved[3]]) & 0x8000) {
+			kb.ki.wVk = keycodes[saved[3]];
+			kb.ki.dwFlags = KEYEVENTF_KEYUP;
+			SendInput(1, &kb, sizeof(INPUT));
+		}
+	}
+
+	if (current[2] < -5.0f) {
+		kb.ki.wVk = keycodes[saved[4]];
+		kb.ki.dwFlags = 0;
+		SendInput(1, &kb, sizeof(INPUT));
+
+		movements += "RR ";
+	}
+	else if (current[2] > 5.0f) {
+		kb.ki.wVk = keycodes[saved[5]];
+		kb.ki.dwFlags = 0;
+		SendInput(1, &kb, sizeof(INPUT));
+
+		movements += "RL ";
+	}
+	else {
+		if (GetKeyState(keycodes[saved[4]]) & 0x8000) {
+			kb.ki.wVk = keycodes[saved[4]];
+			kb.ki.dwFlags = KEYEVENTF_KEYUP;
+			SendInput(1, &kb, sizeof(INPUT));
+		}
+		if (GetKeyState(keycodes[saved[5]]) & 0x8000) {
+			kb.ki.wVk = keycodes[saved[5]];
+			kb.ki.dwFlags = KEYEVENTF_KEYUP;
+			SendInput(1, &kb, sizeof(INPUT));
+		}
+	}
+
+	if (current[4] / base[4] < 0.8f && current[5] / base[5] < 0.8f) {
+		kb.ki.wVk = keycodes[saved[6]];
+		kb.ki.dwFlags = 0;
+		SendInput(1, &kb, sizeof(INPUT));
+
+		movements += "EC ";
+	}
+	else if (current[4] / base[4] < 0.9f) {
+		kb.ki.wVk = keycodes[saved[7]];
+		kb.ki.dwFlags = 0;
+		SendInput(1, &kb, sizeof(INPUT));
+
+		movements += "LE ";
+	}
+	else if (current[5] / base[5] < 0.9f) {
+		kb.ki.wVk = keycodes[saved[8]];
+		kb.ki.dwFlags = 0;
+		SendInput(1, &kb, sizeof(INPUT));
+
+		movements += "RE ";
+	}
+	else {
+		if (GetKeyState(keycodes[saved[6]]) & 0x8000) {
+			kb.ki.wVk = keycodes[saved[6]];
+			kb.ki.dwFlags = KEYEVENTF_KEYUP;
+			SendInput(1, &kb, sizeof(INPUT));
+		}
+		if (GetKeyState(keycodes[saved[7]]) & 0x8000) {
+			kb.ki.wVk = keycodes[saved[7]];
+			kb.ki.dwFlags = KEYEVENTF_KEYUP;
+			SendInput(1, &kb, sizeof(INPUT));
+		}
+		if (GetKeyState(keycodes[saved[8]]) & 0x8000) {
+			kb.ki.wVk = keycodes[saved[8]];
+			kb.ki.dwFlags = KEYEVENTF_KEYUP;
+			SendInput(1, &kb, sizeof(INPUT));
+		}
+	}
+
+	if (current[3] / base[3] > 1.3f) {
+		kb.ki.wVk = keycodes[saved[9]];
+		kb.ki.dwFlags = 0;
+		SendInput(1, &kb, sizeof(INPUT));
+
+		movements += "MO ";
+	}
+	else {
+		if (GetKeyState(keycodes[saved[9]]) & 0x8000) {
+			kb.ki.wVk = keycodes[saved[9]];
+			kb.ki.dwFlags = KEYEVENTF_KEYUP;
+			SendInput(1, &kb, sizeof(INPUT));
+		}
+	}
+
+	if (movements == "") {
+		movements = "None";
+	}
+
+
+	return movements;
+}
+
+cv::String calculateMovementsMouse(vector<float> base, vector<float> current, INPUT kb, INPUT ms, int(&saved)[6], vector<int>(&keycodes), float sensitivity, float threshold) {
+	POINT p;
+	cv::String movements = "";
+
+	if (0.0f < current[0] && current[0] > -170.0f + threshold) {
+		GetCursorPos(&p);
+		SetCursorPos(p.x - ((90.0f - current[0]) * sensitivity), p.y);
+
+		movements += "YL ";	
+	}
+	else if (0.0f > current[0] && current[0] < 170.0f - threshold) {
+		GetCursorPos(&p);
+		SetCursorPos(p.x + ((90.0f - abs(current[0])) * sensitivity), p.y);
+
+		movements += "YR ";
+	}
+	else {
+
+	}
+
+	if ((current[1] - base[1]) > 2.0f - (threshold / 10)) {
+		GetCursorPos(&p);
+		SetCursorPos(p.x, p.y + (abs(current[0]) * sensitivity / 2));
+
+		movements += "PD ";
+	}
+	else if ((current[1] - base[1]) < -2.0f + (threshold / 10)) {
+		GetCursorPos(&p);
+		SetCursorPos(p.x, p.y - (abs(current[0]) * sensitivity / 2));
+
+		movements += "PU ";
+	}
+	else {
+
+	}
+
+	if (current[2] < -5.0f) {
+		kb.ki.wVk = keycodes[saved[0]];
+		kb.ki.dwFlags = 0;
+		SendInput(1, &kb, sizeof(INPUT));
+
+		movements += "RR ";
+	}
+	else if (current[2] > 5.0f) {
+		kb.ki.wVk = keycodes[saved[1]];
+		kb.ki.dwFlags = 0;
+		SendInput(1, &kb, sizeof(INPUT));
+
+		movements += "RL ";
+	}
+	else {
+		if (GetKeyState(keycodes[saved[0]]) & 0x8000) {
+			kb.ki.wVk = keycodes[saved[0]];
+			kb.ki.dwFlags = KEYEVENTF_KEYUP;
+			SendInput(1, &kb, sizeof(INPUT));
+		}
+		if (GetKeyState(keycodes[saved[1]]) & 0x8000) {
+			kb.ki.wVk = keycodes[saved[1]];
+			kb.ki.dwFlags = KEYEVENTF_KEYUP;
+			SendInput(1, &kb, sizeof(INPUT));
+		}
+	}
+
+	/**
+	if (current[4] / base[4] < 0.8f && current[5] / base[5] < 0.8f) {
+		kb.ki.wVk = keycodes[saved[4]];
+		kb.ki.dwFlags = 0;
+		SendInput(1, &kb, sizeof(INPUT));
+
+		movements += "EC ";
+	}
+	else if (current[4] / base[4] < 0.9f) {
+		kb.ki.wVk = keycodes[saved[2]];
+		kb.ki.dwFlags = 0;
+		SendInput(1, &kb, sizeof(INPUT));
+
+		movements += "LE ";
+	}
+	else if (current[5] / base[5] < 0.9f) {
+		kb.ki.wVk = keycodes[saved[3]];
+		kb.ki.dwFlags = 0;
+		SendInput(1, &kb, sizeof(INPUT));
+
+		movements += "RE ";
+	}
+	else {
+		if (GetKeyState(keycodes[saved[2]]) & 0x8000) {
+			kb.ki.wVk = keycodes[saved[2]];
+			kb.ki.dwFlags = KEYEVENTF_KEYUP;
+			SendInput(1, &kb, sizeof(INPUT));
+		}
+		if (GetKeyState(keycodes[saved[3]]) & 0x8000) {
+			kb.ki.wVk = keycodes[saved[3]];
+			kb.ki.dwFlags = KEYEVENTF_KEYUP;
+			SendInput(1, &kb, sizeof(INPUT));
+		}
+		if (GetKeyState(keycodes[saved[4]]) & 0x8000) {
+			kb.ki.wVk = keycodes[saved[4]];
+			kb.ki.dwFlags = KEYEVENTF_KEYUP;
+			SendInput(1, &kb, sizeof(INPUT));
+		}
+	}
+
+	if (current[3] / base[3] > 1.3f) {
+		kb.ki.wVk = keycodes[saved[5]];
+		kb.ki.dwFlags = 0;
+		SendInput(1, &kb, sizeof(INPUT));
+
+		movements += "MO ";
+	}
+	else {
+		if (GetKeyState(keycodes[saved[5]]) & 0x8000) {
+			kb.ki.wVk = keycodes[saved[5]];
+			kb.ki.dwFlags = KEYEVENTF_KEYUP;
+			SendInput(1, &kb, sizeof(INPUT));
+		}
+	}
+	**/
+
+	if (movements == "") {
+		movements = "None";
+	}
+
+
+	return movements;
+}
+
 #endif
 
 // Saves landmarks in current frame
 vector<float> saveBaseLandmarks(vector<cv::Point2f> shapes, cv::Rect face) {
 	vector<cv::Point2f> base = shapes;
+
 	vector<float> vals = calculateVals(base, face, 0.4f, 0.6f);
+	//vector<float> vals = calculateVals(base, face);
 	return vals;
 }
 
@@ -912,20 +1207,20 @@ int main(int, char**) {
 
 #endif
 
-	auto start = chrono::system_clock::now();
-	int counter = 0;
+	//auto start = chrono::system_clock::now();
+	//int counter = 0;
 
 	// Main Process Loop
 	while (true) {
-		counter++;
-		if (counter % 200 == 0) {
-			auto end = chrono::system_clock::now();
-			chrono::duration<double> elapsed_seconds = end - start;
-			time_t end_time = chrono::system_clock::to_time_t(end);
-			printf("\nElapsed time: %f seconds", elapsed_seconds.count());
-			printf("\n%f", 200 / elapsed_seconds.count());
-			start = chrono::system_clock::now();
-		}
+		//counter++;
+		//if (counter % 200 == 0) {
+		//	auto end = chrono::system_clock::now();
+		//	chrono::duration<double> elapsed_seconds = end - start;
+		//	time_t end_time = chrono::system_clock::to_time_t(end);
+		//	printf("\nElapsed time: %f seconds", elapsed_seconds.count());
+		//	printf("\n%f", 200 / elapsed_seconds.count());
+		//	start = chrono::system_clock::now();
+		//	}
 
 		// Fill the frame with a nice color
 		window = cv::Scalar(49, 52, 49);
@@ -1008,9 +1303,11 @@ int main(int, char**) {
 			if (!paused) {
 				if (mode == 1) {
 					message = calculateMovements(base, calculateVals(shapes[0], faces[0], mRatio, nRatio), kb, ms, saved, keycodes, 5.0f-thresholdSens);
+					//message = calculateMovements(base, calculateVals(shapes[0], faces[0]), kb, ms, saved, keycodes, 5.0f - thresholdSens);
 				}
 				else if (mode == -1) {
 					message = calculateMovementsMouse(base, calculateVals(shapes[0], faces[0], mRatio, nRatio), kb, ms, savedMouse, keycodes, (float) mouseSens/10, (float)thresholdSens);
+					//message = calculateMovementsMouse(base, calculateVals(shapes[0], faces[0]), kb, ms, savedMouse, keycodes, (float)mouseSens / 10, (float)thresholdSens);
 				}
 			}
 
