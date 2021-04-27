@@ -399,8 +399,8 @@ cv::String calculateMovementsMouse(vector<float> base, vector<float> current, IN
 #elif ESTIMATION_METHOD == 1
 
 vector<float> compareAngles(vector<float> angles, vector<float> saved) {
-	if (angles[0] < saved[0]) saved[0] = angles[0];
-	if (angles[0] > saved[1]) saved[1] = angles[0];
+	if (angles[0] > 0 && angles[0] < saved[0]) saved[0] = angles[0];
+	if (angles[0] < 0 && angles[0] > saved[1]) saved[1] = angles[0];
 	if (angles[1] < saved[2]) saved[2] = angles[1];
 	if (angles[1] > saved[3]) saved[3] = angles[1];
 	if (angles[2] < saved[4]) saved[4] = angles[2];
@@ -455,6 +455,8 @@ vector<float> calculateVals(vector<cv::Point2f> current, cv::Rect face, float mR
 	angles[3] = (dist2(current[50], current[58]) + dist2(current[51], current[57]) + dist2(current[52], current[56]));
 	angles[4] = (dist2(current[37], current[41]) + dist2(current[38], current[40]));
 	angles[5] = (dist2(current[43], current[47]) + dist2(current[44], current[46]));
+
+	//cout << angles[0] << "   " << angles[1] << "   " << angles[2] << endl;
 	
 	saved = compareAngles(angles, saved);
 
@@ -1216,7 +1218,7 @@ int main(int, char**) {
 
 	vector<cv::Point2f> min = reset();
 	vector<cv::Point2f> max = reset();
-	vector<float> angles(6);
+	vector<float> angles = {90, -90, 5, 5, 0, 0};
 
 #endif
 
